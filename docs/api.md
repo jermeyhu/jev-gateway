@@ -9,6 +9,8 @@
 ```json
 {
   "state": {"error_rate": 0.42, "p99_latency_ms": 3100, "recent_deploy": true},
+  "model": "Qwen3-4B-Instruct",
+  "images": ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="],
   "questions": {
     "is_healthy": {"type": "noul", "instructions": "Is the service healthy?"},
     "severity": {
@@ -24,7 +26,7 @@
       "type": "score",
       "instructions": "How urgent is the response?",
       "criteria": ["can wait", "today", "right now"]
-      }
+    }
   }
 }
 ```
