@@ -114,11 +114,11 @@ python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
 The smoke test hits `/healthz`, `/readyz` and `/v1/systemone`, validates that every answer
 has the right shape, and prints the usage and diagnostics blocks.
 
-!!! note "vLLM and SGLang templates"
+!!! note "vLLM and SGLang"
 
-    The README also shows `docker-compose.vllm.yml` and `docker-compose.sglang.yml`
-    commands. Those two files are not shipped in the repository; point `backend.base_url`
-    at your own vLLM / SGLang service instead. See [Backends](backends.md).
+    Only the llama.cpp compose stack ships with this repository. To reach a vLLM or
+    SGLang server, point `backend.base_url` at it and set `backend.model` to the name
+    the server was started with. See [Backends](backends.md).
 
 ## Where to go next
 

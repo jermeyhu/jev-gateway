@@ -4,12 +4,14 @@
 #
 # The backend is not started here: point backend.base_url in config.yaml at a
 # server you run yourself, then bring the gateway up.  For a self-contained
-# stack that also starts an inference server, use one of the templates next to
-# this file -- each bundles the gateway plus one backend:
+# stack that also starts an inference server, use the template next to this
+# file, which bundles the gateway plus a local llama.cpp server:
 #
 #   docker-compose.llamacpp.yml    gateway + llama.cpp (local .gguf)
-#   docker-compose.vllm.yml        gateway + vLLM
-#   docker-compose.sglang.yml      gateway + SGLang
+#
+# Only that llama.cpp stack ships here.  To use vLLM or SGLang, start the server
+# yourself and edit backend.base_url (and backend.model, if the server requires
+# a served model name) in config.yaml.
 #
 # config.yaml is mounted over /app/config.yaml.  It is the only configuration
 # there is, so edit backend.base_url to point at your server.

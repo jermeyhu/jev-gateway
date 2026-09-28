@@ -1,385 +1,95 @@
 # jev-gateway
 
-[![Documentation](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/)
-[![PyPI](https://img.shields.io/pypi/v/jev-gateway?color=3f51b5)](https://pypi.org/project/jev-gateway/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-3f51b5)](https://www.python.org/)
+[![文档](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/zh/)
+[![许可](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
 
-> Full documentation: **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
-> — also in [简体中文](https://jermeyhu.github.io/jev-gateway/zh/)
+> 完整文档：**[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/zh/)**
+> （English: [/](https://jermeyhu.github.io/jev-gateway/)）
 
-A self-hosted, **Jev / System One compatible** decision gateway. It exposes the single
-`POST /v1/systemone` endpoint you already program against, but runs the decision layer on
-your own inference server instead of the closed TypeSafe API — and extends the contract
-with local **image input**.
+## 1. 系统简介
 
-The gateway speaks exactly one wire protocol: the **OpenAI chat-completions API**
-(`POST /v1/chat/completions` with `logprobs`). Any server that implements it works —
-llama.cpp, vLLM, SGLang, Ollama, LM Studio, TGI, a hosted API — and no engine-specific
-option is ever sent.
+自托管的 Jev / System One 兼容决策网关。对外只暴露你已经在调用的 `POST /v1/systemone`，
+决策层跑在自己的推理服务上，不依赖闭源的 TypeSafe API，并在同一契约上扩展了本地图片
+输入。
 
-The official Jev endpoint is text only (`No image, audio, or video input`), and its
-Pydantic AI client raises `UserError: Files are not supported by this model`. This gateway
-is the drop-in replacement for the text path, and the same process can additionally score
-evidence that includes screenshots or camera frames.
+官方 Jev 接口只接受文本，Pydantic AI 客户端遇到文件 part 直接抛
+`UserError: Files are not supported by this model`，所以截图、相机帧这类证据根本无法参与
+打分。本项目是文本路径的直接替代品，同一个进程还能对带图片的证据额外打分。
 
-## How it works
+网关只说一种协议：**OpenAI chat-completions API**（`POST /v1/chat/completions` 带
+`logprobs`）。任何实现了它的服务都能用——llama.cpp、vLLM、SGLang、Ollama、LM Studio、
+TGI、托管 API——且不会发送任何引擎专属参数。
 
-A Jev call is a *classification* problem, not a generation problem. For every question the
-gateway renders the evidence plus lettered options (`A`, `B`, `C`, …), asks the backend for
-**exactly one** next token with logprobs (`max_tokens: 1`), reads each candidate letter's
-logprob, and softmaxes the candidates into a probability distribution. No text is
-generated, so a decision costs one forward pass over the prompt. That is what makes a
-small local model (0.6B–4B) viable as a router, a gate and a triage classifier.
-
-## Gateway vs direct tool calling
-
-The alternative — asking the model to call a tool and reading the arguments — works too,
-but it must *generate* the call. Measured on the same evidence and rubric (Qwen3.5-0.8B on
-llama.cpp, single-threaded, 6 SRE triage cases × 3 runs, thinking disabled on both paths):
-
-| metric (per case = 3 decisions) | gateway (logprobs) | direct tool call |
-| ------------------------------- | ------------------ | ---------------- |
-| latency, warm prompt cache      | **421 ms**         | 4547 ms          |
-| latency, cold cache (first run) | 4742 ms            | 4258 ms          |
-| output tokens                   | **3** (fixed)      | ~55              |
-| input tokens (18 cases, total)  | 10 881             | 11 661           |
-| accuracy, precise rubric        | 3/4                | 3/4              |
-
-With the prompt cache warm the gateway is **~11× faster** and emits **~18× fewer output
-tokens**; accuracy is the same. Generating a tool-call JSON costs ~18 decode steps per
-decision, while the gateway decodes exactly one token. Use the direct path only when the
-model must reason in free text before deciding.
-
-Two rubric lessons from the same benchmark:
-
-* **Write decidable criteria.** With vague labels ("Total outage / Degraded / Minor") both
-  paths scored near chance — the direct path even answered a trivially-green case `sev1`.
-  Restating each candidate with thresholds decidable from the state ("error_rate ≥ 0.20,
-  OR a region down, …") fixed both paths at once, so the bottleneck was the wording, not
-  the gateway.
-* **The softmax is honest.** Reordering the candidates changes which *letter* wins but not
-  which *label* wins, and the probability mass tracks the evidence (a global outage scores
-  `sev1 ≈ 0.85`). Trust the distribution; calibrate thresholds on your own labelled set.
-
-## Quick start
-
-```bash
-pip install -e ".[dev]"           # or: pip install -e .
-cp config.yaml config.local.yaml  # optional
-JEV_GATEWAY_CONFIG=config.local.yaml python -m app
-```
-
-`JEV_GATEWAY_CONFIG` is the only environment variable the gateway reads; it defaults to
-`./config.yaml`. The server then listens on `server.host:server.port` (default
-`0.0.0.0:8000`).
-
-Docker:
-
-```bash
-docker compose up -d                                   # gateway alone
-docker compose -f docker-compose.llamacpp.yml up -d    # gateway + llama-server
-python scripts/smoke_test.py --url http://127.0.0.1:8000
-```
-
-Two more templates are referenced below but are **not shipped in this repository**:
-`docker-compose.vllm.yml` and `docker-compose.sglang.yml`. Copy
-`docker-compose.llamacpp.yml` and change the `base_url` and the `backend.model` to reach
-either server; see the [backends page](https://jermeyhu.github.io/jev-gateway/backends/).
-
-Each template mounts the same `./config.yaml`; edit the `command` block to change model,
-context length or port. Put a `.gguf` in `./models` before starting a backend stack. Vision
-models also need the projector: add `--mmproj /models/mmproj.gguf` to the `llama-server`
-command and check `GET /props` → `modalities.vision` is `true`.
-
-### Pointing the gateway at a backend
-
-`backend.type` is always `openai`; only `backend.base_url` changes:
-
-| server    | `backend.base_url` on the host | inside compose             | `backend.model`           |
-| --------- | ------------------------------ | -------------------------- | ------------------------- |
-| llama.cpp | `http://127.0.0.1:8080`        | `http://llama-server:8080` | `null` (auto-detected)    |
-| vLLM      | `http://127.0.0.1:8001`        | `http://vllm:8000`         | the `--served-model-name` |
-| SGLang    | `http://127.0.0.1:8002`        | `http://sglang:30000`      | the `--served-model-name` |
-
-Inside a container `base_url` is never `127.0.0.1` (that is the gateway's own loopback);
-to reach a server on the Docker host use `http://host.docker.internal:8080`. For vLLM and
-SGLang, `backend.model` must match `--served-model-name`; leave it `null` to auto-detect.
-
-Check it end to end against a running backend:
-
-```bash
-python scripts/smoke_test.py --url http://127.0.0.1:8000
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
-```
-
-## API
-
-### `POST /v1/systemone`
-
-```json
-{
-  "state": {"error_rate": 0.42, "p99_latency_ms": 3100, "recent_deploy": true},
-  "questions": {
-    "is_healthy": {"type": "noul", "instructions": "Is the service healthy?"},
-    "severity": {
-      "type": "choice",
-      "instructions": "Pick the incident severity.",
-      "criteria": {
-        "sev1": "error_rate is 0.20 or higher, OR a whole region is down",
-        "sev2": "error_rate is 0.05 or higher but below 0.20",
-        "sev3": "error_rate is below 0.05 AND users are not visibly impacted"
-      }
-    },
-    "urgency": {
-      "type": "score",
-      "instructions": "How urgent is the response?",
-      "criteria": ["can wait", "today", "right now"]
-    }
-  }
-}
-```
-
-Optional top-level fields: `model` (advisory only) and `images` (data URLs, remote URLs
-opt-in, or raw base64). `state` accepts a non-empty string, object or list without
-`NaN`/`Infinity`. Unknown keys anywhere are rejected. A question carries 2–**16**
-candidates; more is rejected with `INVALID_REQUEST`.
-
-Response:
-
-```json
-{
-  "model": "Qwen3-4B-Instruct",
-  "answers": {
-    "is_healthy": {"type": "noul", "noul": 0.0314},
-    "severity": {
-      "type": "choice",
-      "choice": "sev2",
-      "probabilities": {"sev1": 0.024, "sev2": 0.921, "sev3": 0.055}
-    },
-    "urgency": {
-      "type": "score",
-      "score": 1.86,
-      "legend": {"0": "can wait", "1": "today", "2": "right now"},
-      "probabilities": {"0": 0.041, "1": 0.058, "2": 0.901}
-    }
-  },
-  "usage": {"input_tokens": 1421, "output_tokens": 3},
-  "diagnostics": {
-    "backend": "openai",
-    "model": "Qwen3-4B-Instruct",
-    "total_latency_ms": 214.7,
-    "questions": {
-      "is_healthy": {"latency_ms": 61.2, "truncated": false, "backend": "openai"}
-    }
-  }
-}
-```
-
-Answer shapes:
-
-* `noul` → `{"type": "noul", "noul": p}` — probability of `criteria.true` (or `Yes`).
-* `choice` → argmax candidate plus the full distribution over candidate keys.
-* `score` → probability-weighted mean of the level indices, so it interpolates between
-  levels instead of collapsing to one.
-
-Semantics matching the reference implementation: questions run **concurrently** (bounded
-by `backend.max_concurrency`); **any** failing question fails the whole request;
-`request.total_timeout_seconds` bounds the whole request, not each question.
-
-### Other endpoints
-
-| endpoint         | purpose                                      |
-| ---------------- | -------------------------------------------- |
-| `GET /healthz`   | liveness; never touches the backend          |
-| `GET /readyz`    | readiness; probes the backend, 503 when down |
-| `GET /v1/models` | OpenAI-shaped model list                     |
-
-Every response carries an `x-request-id` header; send your own to correlate logs.
-
-### Errors
-
-```json
-{"error": {"code": "BACKEND_TIMEOUT", "message": "...", "detail": null, "request_id": "..."}}
-```
-
-| code                          | status | when                                                  |
-| ----------------------------- | ------ | ----------------------------------------------------- |
-| `INVALID_REQUEST`             | 400    | schema/limit violation, bad image, unsupported feature |
-| `BACKEND_CAPABILITY_UNSUPPORTED` | 400  | the model or backend cannot serve images               |
-| `BACKEND_PROTOCOL_ERROR`      | 502    | backend answered with something unusable               |
-| `BACKEND_UNAVAILABLE`         | 502    | connection refused / backend errored                   |
-| `BACKEND_NOT_READY`           | 503    | backend not loaded or not reachable                    |
-| `BACKEND_TIMEOUT`             | 504    | one question exceeded `backend.timeout_seconds`        |
-| `REQUEST_TIMEOUT`             | 504    | the request exceeded `request.total_timeout_seconds`   |
-
-## Images (extension)
-
-Images attach to the front of the first user message, so the vision encoder result and the
-evidence prefill stay cached across all questions of one request. Accepted forms:
-`data:image/jpeg;base64,...`, `https://...` (only with `multimodal.allow_remote_urls:
-true`), or raw base64 with the media type sniffed from magic bytes (jpeg, png, gif, bmp,
-tiff, webp). Limits come from the `multimodal` config block. If the backend has no vision
-support the request fails fast with `BACKEND_CAPABILITY_UNSUPPORTED`; set
-`backend.supports_images: false` to disable the path entirely.
-
-## Configuration reference
-
-Unknown keys are a hard error, so a typo fails at startup instead of being ignored.
-
-| section      | key                                             | default              | notes                                                            |
-| ------------ | ----------------------------------------------- | -------------------- | ---------------------------------------------------------------- |
-| `server`     | `host` / `port`                                 | `0.0.0.0` / `8000`   |                                                                  |
-| `backend`    | `type`                                          | `openai`             | the only supported protocol                                      |
-| `backend`    | `base_url` / `model` / `api_key`                | — / `null` / `null`  | `model: null` reports the backend's own model name                |
-| `backend`    | `timeout_seconds`                               | `30.0`               | per question                                                     |
-| `backend`    | `max_concurrency`                               | `32`                 | per gateway instance                                              |
-| `backend`    | `top_logprobs`                                  | `128`                | 16–4096; candidates outside the window are floored                |
-| `backend`    | `supports_images`                               | `null` (auto)        | `true` / `false` to force                                        |
-| `backend`    | `extra_headers` / `extra_body`                  | `{}`                 | cloud API keys, tenant ids; see *Reasoning models*                |
-| `request`    | `max_questions`                                 | `64`                 | 1–64 questions per request                                        |
-| `request`    | `total_timeout_seconds`                         | `60.0`               | whole-request budget                                              |
-| `request`    | `prompt_layout`                                 | `fused`              | `fused` \| `split`                                                |
-| `multimodal` | `enabled` / `max_images` / `max_image_bytes`    | `true` / `4` / `5242880` | `allow_remote_urls: false`                                  |
-| `logging`    | `level`                                         | `INFO`               |                                                                  |
-
-### Prompt layouts
-
-* `fused` — one user message with `{evidence, criterion, options}`; byte compatible with
-  the reference gateway, so calibration measured against the hosted API transfers.
-* `split` — evidence (and images) in the first user message, criterion and options in a
-  second. The first message is identical for every question, so llama.cpp reuses the
-  vision encoder work and the state prefill. Use it when latency matters more than
-  byte-compatibility.
-
-## Backends
-
-The gateway sends `POST /v1/chat/completions` with `max_tokens: 1`, `logprobs: true` and
-`top_logprobs: N`, then reads the next-token distribution from
-`choices[0].logprobs.content[0].top_logprobs`. Every returned token is mapped onto a
-candidate letter (`"A"` and `" A"` both count); the most likely variant wins. A candidate
-outside the top-N window is floored at the least likely returned logprob and the question
-is flagged `truncated` — raise `backend.top_logprobs` (up to 4096) if you see that flag.
-
-`backend.supports_images: null` means "auto": assume the backend accepts images and never
-advertise them if they are absent. Set it to `false` when the model has no vision tower,
-so image requests fail fast instead of reaching the backend.
-
-### Reasoning models
-
-A *reasoning* model (Qwen3 / Qwen3.5, DeepSeek-R1, OpenAI o-series, …) emits its thinking
-as the first token, so no candidate letter lands in the top-N window and every question
-fails with `BACKEND_PROTOCOL_ERROR`. The gateway does not guess the fix; set
-`backend.extra_body` to the switch your server understands:
-
-| backend                           | `backend.extra_body`                             |
-| --------------------------------- | ------------------------------------------------ |
-| llama.cpp / vLLM / SGLang (Qwen3) | `chat_template_kwargs: {enable_thinking: false}` |
-| OpenAI o-series / GPT-5           | `reasoning_effort: none`                         |
-| OpenRouter (any reasoning model)  | `reasoning: {enabled: false}`                    |
-| DeepSeek `deepseek-reasoner`      | *(no off switch — use `deepseek-chat` instead)*  |
-
-`extra_body` is merged into every request but can never override `messages`, `max_tokens`,
-`logprobs` or `top_logprobs`. Leave it `{}` for a non-reasoning model.
-
-## Scripts
-
-Decision models are **calibration sensitive**: threshold gating (`if p < 0.7: ask a human`)
-only works if the probabilities are honest, and aggressive quantisation can preserve the
-argmax while destroying the confidence. Prefer Q8_0 or F16 for gate models; treat Q4_K_M
-as an experiment.
-
-| script                   | purpose                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `smoke_test.py`          | end-to-end health check against a running gateway (`--image` for vision)       |
-| `compare_backends.py`    | A/B servers on the same cases; argmax agreement, mean abs delta, Brier distance |
-| `bench_triage.py`        | accuracy: gateway logprobs vs direct tool calling on SRE triage cases          |
-| `bench_speed_tokens.py`  | speed + output tokens: gateway vs direct tool calling (`--repeat N`)           |
-| `diagnose_severity.py`   | vague vs precise rubric across both paths (isolates wording vs design)         |
-| `probe_position_bias.py` | reorder candidates to tell position bias from semantic judgement               |
-| `probe_live.py`          | boundary checks against a live gateway (image limits, candidate limits)        |
-| `make_test_png.py`       | generate a tiny valid PNG without Pillow                                       |
-
-`compare_backends.py` runs the same case set against several servers and reports what
-actually matters:
-
-```bash
-python scripts/compare_backends.py \
-    --backend llama=http://127.0.0.1:8080+top_logprobs:128 \
-    --backend vllm=http://127.0.0.1:8001+top_logprobs:64 \
-    --repeat 3
-```
-
-```
-=== pairwise agreement ===
-llama vs vllm: argmax 4/5, mean|dp| 0.0413, brier distance 0.00298
-
-=== latency ===
-llama                  n=15  p50=  62.4ms p95=  88.1ms mean=  67.0ms
-vllm                   n=15  p50=  41.9ms p95=  55.3ms mean=  44.8ms
-```
-
-* **argmax agreement** — did the *ranking* survive?
-* **mean|dp|** — how far the probability vectors moved.
-* **Brier distance** — the mean squared gap between them. This is the number to watch:
-  high argmax agreement with a large Brier distance means a quantisation or backend change
-  quietly broke your thresholds.
-
-`--backend` takes `NAME=URL[+key:value]`, where the optional values are
-`model`, `api_key`, `top_logprobs`, `supports_images`.
-
-## Development
+## 2. 快速启动
 
 ```bash
 pip install -e ".[dev]"
-pytest -q
-ruff check .
-mypy app
+python -m app                              # 监听 0.0.0.0:8000
+python scripts/smoke_test.py --url http://127.0.0.1:8000
 ```
 
-The suite covers prompt layouts, image parsing, the logprob → answer maths, the backend
-against mock transports, config validation, the HTTP surface, and an end-to-end in-process
-request. No network or GPU is required.
+对接后端只需改 `config.yaml`——`backend.type` 恒为 `openai`，只有 `backend.base_url` 会变：
 
-## Documentation
+| 服务      | 宿主机 `base_url`      | compose 内部               | `backend.model`             |
+| --------- | ---------------------- | -------------------------- | --------------------------- |
+| llama.cpp | `http://127.0.0.1:8080` | `http://llama-server:8080` | `null`（自动探测）          |
+| vLLM      | `http://127.0.0.1:8001` | `http://vllm:8000`         | 对应 `--served-model-name`  |
+| SGLang    | `http://127.0.0.1:8002` | `http://sglang:30000`      | 对应 `--served-model-name`  |
 
-The full documentation lives at **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
-(简体中文: [/zh/](https://jermeyhu.github.io/jev-gateway/zh/)) and is built from `docs/`
-with MkDocs Material. Pages: [quick start](https://jermeyhu.github.io/jev-gateway/quick-start/),
-[how it works](https://jermeyhu.github.io/jev-gateway/how-it-works/),
-[API reference](https://jermeyhu.github.io/jev-gateway/api/),
-[configuration](https://jermeyhu.github.io/jev-gateway/configuration/),
-[backends](https://jermeyhu.github.io/jev-gateway/backends/),
-[images](https://jermeyhu.github.io/jev-gateway/images/),
-[scripts](https://jermeyhu.github.io/jev-gateway/scripts/),
-[limits & FAQ](https://jermeyhu.github.io/jev-gateway/limits/) and
-[development](https://jermeyhu.github.io/jev-gateway/development/).
-
-To build it locally:
+或者用 Docker：
 
 ```bash
-pip install -r requirements-docs.txt
-mkdocs serve        # http://127.0.0.1:8001
-mkdocs build --strict
+docker compose up -d                                   # 仅网关
+docker compose -f docker-compose.llamacpp.yml up -d    # 网关 + llama-server
 ```
 
-## Notes and limits
+`JEV_GATEWAY_CONFIG` 是唯一读取的环境变量，默认 `./config.yaml`。要接 vLLM 或 SGLang，
+复制 compose 文件并改掉 `base_url` 和 `backend.model` —— 仓库里只随附 llama.cpp 那套。
 
-* The `noul` probability is a softmax over the two candidate letters only; calibrate
-  thresholds against your own labelled set.
-* A question carries at most **16 candidates**; more is rejected with `INVALID_REQUEST`.
-* `truncated: true` in diagnostics means a candidate was floored; raise `top_logprobs`.
-* Images extend the reference contract; clients written against the hosted service still
-  work but ignore the field.
-* Scale horizontally behind a load balancer rather than raising `max_concurrency` beyond
-  the backend's real capacity.
+## 3. 原理说明
 
-## Acknowledgements
+Jev 的一次调用是分类问题，不是生成问题。每个问题：渲染证据加带字母的选项（`A`、`B`、
+`C`…），向后端请求**恰好一个** next token 的 logprobs（`max_tokens: 1`），读出每个候选
+字母的 logprob，对候选做 softmax 得到概率分布。不生成任何文本，一次决策的成本就是
+prompt 上的一次前向传播。这正是 0.6B–4B 小模型能充当路由、门禁和分诊分类器的原因。
 
-The request/response contract and the logprob-classification idea are modelled on
-[David-Lolly/Jev-Compatible](https://github.com/David-Lolly/Jev-Compatible) — thanks for
-the reference implementation this gateway stays compatible with.
+与直连工具调用在同一证据、同一评分标准下的实测（Qwen3.5-0.8B + llama.cpp，单线程，6 个
+SRE 分诊案例 × 3 轮，两条路径都关思考）：
 
-## License
+| 指标（每案例 = 3 个决策） | 网关（logprobs） | 直连工具调用 |
+| ------------------------- | ---------------- | ------------ |
+| 延迟，prompt 缓存命中后   | **421 ms**       | 4547 ms      |
+| 输出 token                | **3**（固定）    | ~55          |
+| 正确率（精确评分标准）    | 3/4              | 3/4          |
 
-Apache-2.0.
+prompt 缓存命中后网关**快约 11 倍**、输出 token **少约 18 倍**，正确率相同。生成一次工具调用
+JSON 每个决策要解码约 18 个 token，而网关只解码 1 个。只有当模型需要先自由推理再决策时才用
+直连。
+
+两条值得记住的经验：
+
+* **把判据写成可判定的。** 用模糊标签（"Total outage / Degraded / Minor"）时两条路径都
+  接近随机。把每个候选改写成能从 state 直接验证的阈值（"error_rate ≥ 0.20，或整区宕
+  机…"）后，两条路径同时改善，说明瓶颈在措辞，不在网关。
+* **softmax 是诚实的。** 打乱候选顺序只会改变哪个*字母*胜出，不会改变哪个*标签*胜出，
+  概率质量跟着证据走（全局宕机时 `sev1 ≈ 0.85`）。可以信任分布本身；阈值在自己的标注集
+  上校准。
+
+*推理*模型（Qwen3 / Qwen3.5、DeepSeek-R1、OpenAI o 系列……）会把思考内容作为第一个
+token 输出，于是没有任何字母落进 top-N 窗口，每个问题都以 `BACKEND_PROTOCOL_ERROR`
+失败。关掉思考的方式见[后端页面](https://jermeyhu.github.io/jev-gateway/zh/backends/)。
+
+## 文档
+
+完整参考在 **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/zh/)**
+（English: [/](https://jermeyhu.github.io/jev-gateway/)），由 `docs/` 用 MkDocs Material
+构建：快速开始、工作方式、接口参考、配置参考、后端、图片、脚本、限制与 FAQ、开发。
+
+## 致谢
+
+请求/响应契约与 logprob 分类的思路参考了
+[David-Lolly/Jev-Compatible](https://github.com/David-Lolly/Jev-Compatible)。
+
+## 许可
+
+[Apache-2.0](LICENSE)。

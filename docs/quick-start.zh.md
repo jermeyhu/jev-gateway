@@ -109,11 +109,10 @@ python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
 冒烟脚本会访问 `/healthz`、`/readyz` 和 `/v1/systemone`，校验每个答案的结构是否正确，并
 打印 usage 与 diagnostics。
 
-!!! note "vLLM 与 SGLang 模板"
+!!! note "vLLM 与 SGLang"
 
-    README 里还出现了 `docker-compose.vllm.yml` 和 `docker-compose.sglang.yml` 的命令，
-    但仓库中并没有附带这两个文件。请自行启动 vLLM / SGLang 服务，再把 `base_url` 指过去。
-    见[后端](backends.zh.md)。
+    仓库里只随附 llama.cpp 那套 compose。要对接 vLLM 或 SGLang，把 `backend.base_url`
+    指过去，并把 `backend.model` 设成服务启动时用的名字。见[后端](backends.zh.md)。
 
 ## 接下来 {#where-to-go-next}
 

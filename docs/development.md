@@ -88,7 +88,7 @@ languages. Adding a page means adding it to `nav:` in **both** languages, and cr
    working.
 3. Add or update the test that pins the behaviour you are changing.
 4. Run `Check all` (lint, types, tests) before opening a pull request.
-5. If the change is user-visible, update both `README.md` and `README.zh-CN.md`, and the
+5. If the change is user-visible, update both `README.md` and `README.en.md`, and the
    matching pages under `docs/`.
 
 Unknown config keys stay a hard error, and `extra_body` stays unable to override the
