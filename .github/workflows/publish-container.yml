@@ -1,0 +1,139 @@
+name: Publish container image
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: "Image tag to publish, e.g. 0.1.0 or 0.1.0-rc1"
+        required: true
+        type: string
+      publish:
+        description: "true = push to GHCR, false = build only"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+# Pushing to ghcr.io needs an id-token so the registry auth exchange can mint
+# a short-lived token scoped to this repository's packages.
+permissions:
+  contents: read
+  packages: write
+
+# One release at a time; queue rather than cancel an in-progress publish.
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        # A stock runner has ~14 GB, and arm64 emulation plus the pip install
+        # run close to that.  dotnet, the android SDK and ghc are preinstalled
+        # on the image and unused here.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          # 'all' registers binfmt handlers for every architecture.  Naming
+          # arm64 alone has left the handler unregistered on some runner
+          # images, which surfaces much later as an opaque exec format error.
+          platforms: all
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # A v1.2.3 push yields 1.2.3, 1.2, latest and sha-abc1234.  A pre-release
+      # such as v1.2.3-rc1 yields 1.2.3-rc1 and its sha only, so it can never
+      # take over the latest tag by accident.  The tag rules stay inline here
+      # rather than in a workflow-level env var, because metadata-action parses
+      # 'enable=' against the runtime value of the field, and a folded scalar
+      # collapses the five rules into one unparseable line.
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},enable=${{ !contains(github.ref_name, '-') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=${{ inputs.image-tag }},enable=${{ inputs.image-tag != '' }}
+            type=sha,format=short
+
+      # Both platforms in one build, so the tag is written once as a manifest
+      # list.  Building them as separate jobs and merging afterwards would
+      # briefly leave 'latest' pointing at a single architecture.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # A build-only run must not create or move any tag.
+          push: ${{ github.event_name == 'push' || inputs.publish == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the published image
+        # A green build proves nothing if the container cannot answer, so run
+        # the amd64 image back out of the registry.  No backend is needed:
+        # /healthz and /readyz never talk to the model server.
+        if: github.event_name == 'push' || inputs.publish == 'true'
+        run: |
+          image="${REGISTRY}/${IMAGE}:${{ inputs.image-tag || 'latest' }}"
+          docker pull --platform linux/amd64 "$image"
+          docker run -d --name jev -p 8000:8000 "$image"
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz; then
+              echo; echo "healthy"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "container never became healthy" >&2
+              docker logs jev
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # /v1/chat/completions needs a live backend, so the served schema is
+          # the furthest a self-contained check can reach.
+          curl -fsS http://127.0.0.1:8000/openapi.json -o /dev/null
+          echo "openapi ok"
+          docker rm -f jev
+
+      - name: Summary
+        run: |
+          {
+            echo "### Container image"
+            echo
+            echo '```bash'
+            echo "docker pull ${REGISTRY}/${IMAGE}:${{ inputs.image-tag || 'latest' }}"
+            echo '```'
+            echo
+            echo '```'
+            ${{ steps.meta.outputs.tags }}
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
