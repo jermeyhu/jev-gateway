@@ -93,4 +93,4 @@ python scripts/smoke_test.py --url http://127.0.0.1:8000 --image shot.png
 ```
 
 The smoke test sends a data URL built from the file and asserts that the answer still comes
-back with the right shape. See [Scripts](scripts.en.md).
+back with the right shape. See [Scripts](scripts).

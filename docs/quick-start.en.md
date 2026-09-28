@@ -118,10 +118,10 @@ has the right shape, and prints the usage and diagnostics blocks.
 
     Only the llama.cpp compose stack ships with this repository. To reach a vLLM or
     SGLang server, point `backend.base_url` at it and set `backend.model` to the name
-    the server was started with. See [Backends](backends.en.md).
+    the server was started with. See [Backends](backends).
 
 ## Where to go next
 
-* [How it works](how-it-works.en.md) — the classification trick and the prompt layouts.
-* [API reference](api.en.md) — every field, endpoint and error code.
-* [Backends](backends.en.md) — the `base_url` table for llama.cpp, vLLM and SGLang.
+* [How it works](how-it-works) — the classification trick and the prompt layouts.
+* [API reference](api) — every field, endpoint and error code.
+* [Backends](backends) — the `base_url` table for llama.cpp, vLLM and SGLang.

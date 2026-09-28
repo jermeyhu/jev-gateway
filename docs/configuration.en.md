@@ -69,7 +69,7 @@ Docker Compose templates use.
 ### `backend`
 
 `type` is always `openai` — the gateway speaks exactly one protocol. What changes between
-servers is only `base_url`; see [Backends](backends.en.md#base_url-by-server).
+servers is only `base_url`; see [Backends](backends#base_url-by-server).
 
 `model: null` means auto-detect: the gateway asks the server's `/v1/models` and uses the
 first model it reports. Servers that name several models, or that require the client to
@@ -102,7 +102,7 @@ saturated.
 
 `prompt_layout` is `fused` (default, byte-compatible with the reference gateway) or
 `split` (cache-friendly). Both are described in
-[How it works](how-it-works.en.md#prompt-layouts).
+[How it works](how-it-works#prompt-layouts).
 
 ### `multimodal`
 

@@ -3,6 +3,8 @@
 [![文档](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/)
 [![许可](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
 
+[English](https://github.com/jermeyhu/jev-gateway/blob/main/README.en.md) · 简体中文
+
 > 完整文档：**[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
 > （English: [/en/](https://jermeyhu.github.io/jev-gateway/en/)）
 
@@ -82,7 +84,7 @@ token 输出，于是没有任何字母落进 top-N 窗口，每个问题都以 
 ## 文档
 
 完整参考在 **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
-（English: [/](https://jermeyhu.github.io/jev-gateway/)），由 `docs/` 用 MkDocs Material
+（English: [/en/](https://jermeyhu.github.io/jev-gateway/en/)），由 `docs/` 用 MkDocs Material
 构建：快速开始、工作方式、接口参考、配置参考、后端、图片、脚本、限制与 FAQ、开发。
 
 ## 致谢

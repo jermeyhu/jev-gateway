@@ -75,32 +75,21 @@ plugins:
           default: true
           build: true
           site_name: Jev Gateway
-          nav_translations:
-            首页: 首页
-            快速开始: 快速开始
-            工作方式: 工作方式
-            接口参考: 接口参考
-            配置参考: 配置参考
-            后端: 后端
-            图片: 图片
-            脚本: 脚本
-            限制与 FAQ: 限制与 FAQ
-            开发: 开发
         - locale: en
           name: English
           build: true
           site_name: Jev Gateway
           nav_translations:
-            Home: Home
-            Quick start: Quick start
-            How it works: How it works
-            API reference: API reference
-            Configuration: Configuration
-            Backends: Backends
-            Images: Images
-            Scripts: Scripts
-            Limits & FAQ: Limits & FAQ
-            Development: Development
+            首页: Home
+            快速开始: Quick start
+            工作方式: How it works
+            接口参考: API reference
+            配置参考: Configuration
+            后端: Backends
+            图片: Images
+            脚本: Scripts
+            限制与 FAQ: Limits & FAQ
+            开发: Development
 
 nav:
   - 首页: index.md

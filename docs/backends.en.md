@@ -50,7 +50,7 @@ floored probability is not trustworthy.
     report log10), but softmax is scale-invariant in the sense that a *monotone* transform
     of all logprobs would change the result. In practice servers agree on natural log and
     the distributions are comparable — which is exactly what
-    [`compare_backends.py`](scripts.en.md#comparing-two-backends) measures.
+    [`compare_backends.py`](scripts#comparing-two-backends) measures.
 
 ## `supports_images`
 
@@ -122,4 +122,4 @@ vllm                   n=15  p50=  41.9ms p95=  55.3ms mean=  44.8ms
   high argmax agreement with a large Brier distance means a quantisation or backend change
   quietly broke your thresholds.
 
-See [Scripts](scripts.en.md#comparing-two-backends) for the full script list.
+See [Scripts](scripts#comparing-two-backends) for the full script list.

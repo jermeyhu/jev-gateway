@@ -86,7 +86,7 @@ rejected with `INVALID_REQUEST`.
 
 `diagnostics.questions.<id>.truncated` is `true` when a candidate letter was outside the
 returned `top_logprobs` window and had to be floored. See
-[Backends](backends.en.md#reading-the-top-n-window).
+[Backends](backends#reading-the-top-n-window).
 
 ### Semantics
 

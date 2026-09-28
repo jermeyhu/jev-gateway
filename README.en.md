@@ -3,6 +3,8 @@
 [![Documentation](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
 
+English · [简体中文](https://github.com/jermeyhu/jev-gateway/blob/main/README.md)
+
 > Full documentation: **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
 > — also in [简体中文](https://jermeyhu.github.io/jev-gateway/)
 

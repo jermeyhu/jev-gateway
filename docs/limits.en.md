@@ -18,7 +18,7 @@ human` — only works if the probabilities are honest, and aggressive quantisati
 preserve the argmax while destroying the confidence.
 
 Prefer **Q8_0 or F16** for gate models. Treat Q4_K_M as an experiment, and measure it with
-[`compare_backends.py`](scripts.en.md#comparing-two-backends) rather than assuming.
+[`compare_backends.py`](scripts#comparing-two-backends) rather than assuming.
 
 Two habits keep a threshold trustworthy:
 
@@ -52,7 +52,7 @@ only when the model must reason in free text before deciding.
 
 Almost always a reasoning model emitting its thinking as the first token, so no candidate
 letter lands in the top-N window. Set `backend.extra_body` to your server's off switch —
-see [Reasoning models](backends.en.md#reasoning-models). The other two causes are a server
+see [Reasoning models](backends#reasoning-models). The other two causes are a server
 that does not return `logprobs.content[0].top_logprobs`, and a chat template that never
 produces a bare letter. Check the raw response with `curl` before changing any setting.
 
@@ -90,7 +90,7 @@ model is reading position rather than meaning and the numbers should not be thre
 ### Can I use it with a reasoning model?
 
 Yes, with thinking disabled via `backend.extra_body` — the recipes per server are in
-[Reasoning models](backends.en.md#reasoning-models). DeepSeek's `deepseek-reasoner` has no
+[Reasoning models](backends#reasoning-models). DeepSeek's `deepseek-reasoner` has no
 off switch; use `deepseek-chat`.
 
 ### Which model size is enough?

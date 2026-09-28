@@ -95,7 +95,7 @@ output tokens. The gateway decodes exactly one token.
 
 On the same evidence and rubric the two paths produced identical accuracy, but the gateway
 was ~11× faster with a warm prompt cache. Choose the direct path only when the model must
-reason in free text before deciding. See [Limits & FAQ](limits.en.md#why-is-the-direct-tool-calling-path-slower).
+reason in free text before deciding. See [Limits & FAQ](limits#why-is-the-direct-tool-calling-path-slower).
 
 ## The system prompt
 

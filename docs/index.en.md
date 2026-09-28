@@ -22,8 +22,8 @@ option is ever sent.
 
 <div class="jev-actions" markdown>
 
-[Get started :material-arrow-right:](quick-start.en.md){ .md-button .md-button--primary }
-[View the API reference](api.en.md){ .md-button }
+[Get started :material-arrow-right:](quick-start){ .md-button .md-button--primary }
+[View the API reference](api){ .md-button }
 [Source on GitHub](https://github.com/jermeyhu/jev-gateway){ .md-button }
 
 </div>
@@ -97,7 +97,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     Install, configure and run the gateway against a local llama.cpp, vLLM or SGLang
     server, with a smoke test you can paste into your terminal.
 
-    [:octicons-arrow-right-24: Get started](quick-start.en.md)
+    [:octicons-arrow-right-24: Get started](quick-start)
 
 -   :material-function-variant: **How it works**
 
@@ -106,7 +106,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     The classification trick, the two prompt layouts, the logprob parsing rules, and why
     one forward pass is enough.
 
-    [:octicons-arrow-right-24: Understand the design](how-it-works.en.md)
+    [:octicons-arrow-right-24: Understand the design](how-it-works)
 
 -   :material-api: **API reference**
 
@@ -115,7 +115,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     Request and response shapes for `POST /v1/systemone`, the health endpoints, the error
     table and the request-id contract.
 
-    [:octicons-arrow-right-24: Read the API](api.en.md)
+    [:octicons-arrow-right-24: Read the API](api)
 
 -   :material-tune: **Configuration**
 
@@ -124,7 +124,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     Every key in `config.yaml`, its default, and the two rules that make a typo fail at
     startup instead of silently.
 
-    [:octicons-arrow-right-24: Configure it](configuration.en.md)
+    [:octicons-arrow-right-24: Configure it](configuration)
 
 -   :material-server-network: **Backends**
 
@@ -133,7 +133,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     Point the gateway at any OpenAI-compatible server, and the `extra_body` recipe that
     switches thinking off in reasoning models.
 
-    [:octicons-arrow-right-24: Connect a backend](backends.en.md)
+    [:octicons-arrow-right-24: Connect a backend](backends)
 
 -   :material-image-multiple: **Images**
 
@@ -142,7 +142,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     The accepted image forms, the limits, and why images are attached to the front of the
     first user message.
 
-    [:octicons-arrow-right-24: Add images](images.en.md)
+    [:octicons-arrow-right-24: Add images](images)
 
 -   :material-flask-outline: **Scripts**
 
@@ -151,7 +151,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     Smoke tests, A/B backend comparison, triage accuracy, speed and token benchmarks, and
     the probes that separate a wording problem from a design problem.
 
-    [:octicons-arrow-right-24: Run the scripts](scripts.en.md)
+    [:octicons-arrow-right-24: Run the scripts](scripts)
 
 -   :material-alert-circle-outline: **Limits & FAQ**
 
@@ -160,7 +160,7 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
     The known limits, the calibration caveats, and answers to the questions that come up
     before you trust a probability.
 
-    [:octicons-arrow-right-24: Know the limits](limits.en.md)
+    [:octicons-arrow-right-24: Know the limits](limits)
 
 </div>
 
