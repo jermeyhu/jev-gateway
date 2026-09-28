@@ -61,6 +61,18 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Without this, buildx asks ghcr.io for an *anonymous* token and gets
+      # 403 Forbidden.  The 'packages: write' permission above only widens
+      # what GITHUB_TOKEN may do; it does not log anything in.  The buildx
+      # created by setup-buildx-action picks the credentials up from the
+      # docker config this writes, so this has to come after it.
+      - name: Log in to GitHub Packages
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # A v1.2.3 push yields 1.2.3, 1.2, latest and sha-abc1234.  A pre-release
       # such as v1.2.3-rc1 yields 1.2.3-rc1 and its sha only, so it can never
       # take over the latest tag by accident.  The tag rules stay inline here
