@@ -1,4 +1,4 @@
-"""One-off: BOM-free UTF-8 commit, then push.  Delete after use."""
+"""One-off: BOM-free UTF-8 commit and push.  Delete after use."""
 
 from __future__ import annotations
 
@@ -7,19 +7,22 @@ import subprocess
 import sys
 
 GIT = r"C:\Program Files\Git\cmd\git.exe"
-MESSAGE = """Log in to ghcr.io before building, so the push stops getting a 403
+MESSAGE = """Pass multi-line and operator-supplied values through env, not the script
 
-The v0.1.0 run built both architectures fine and then failed at the push:
+The v0.1.0 publish worked: the image built, pushed, and passed the /healthz
+smoke test.  The run was still red because the last step, which only writes
+the job summary, failed.
 
-  failed to fetch anonymous token: GET https://ghcr.io/token?scope=
-  repository:jermeyhu/jev-gateway:pull,push ... 403 Forbidden
+It interpolated steps.meta.outputs.tags straight into a run: block.  That
+output is one tag per line, and a ${{ }} expansion is pasted into the shell
+verbatim with no escaping, so every line after the first was executed as its
+own command.  Both values now travel through the environment, where they stay
+single inert strings.
 
-'Anonymous' is the tell: buildx asked ghcr.io for a token with no
-credentials at all, because nothing had logged in.  The packages: write
-permission only widens what GITHUB_TOKEN is allowed to do, it does not
-hand it to the registry.  docker/login-action writes the credentials into
-the docker config that the buildx from setup-buildx-action reads, so it has
-to run after that step.
+The smoke test had the same shape, with inputs.image-tag in it.  That one
+happens to be a single line today, but it is operator-supplied and pasted
+unescaped, so it moves to env as well rather than waiting for someone to put
+a space or a quote in that field.
 """
 
 
@@ -29,10 +32,7 @@ def main() -> int:
     try:
         result = subprocess.run(
             [GIT, "commit", "-q", "-F", str(message)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
     finally:
         message.unlink(missing_ok=True)
@@ -41,11 +41,15 @@ def main() -> int:
     if result.returncode != 0:
         return result.returncode
 
-    log = subprocess.run(
-        [GIT, "log", "-1", "--pretty=%h %s"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-    )
-    print(log.stdout.strip())
+    for args in (["log", "-1", "--pretty=%h %s"], ["push", "origin", "main"]):
+        out = subprocess.run(
+            [GIT, *args], capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
+        )
+        tail = (out.stdout or out.stderr or "").strip().splitlines()
+        print(tail[-1] if tail else "")
+        if out.returncode != 0:
+            return out.returncode
     return 0
 
 

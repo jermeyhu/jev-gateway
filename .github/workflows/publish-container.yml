@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Free disk space
         # A stock runner has ~14 GB, and arm64 emulation plus the pip install
@@ -112,8 +112,12 @@ jobs:
         # the amd64 image back out of the registry.  No backend is needed:
         # /healthz and /readyz never talk to the model server.
         if: github.event_name == 'push' || inputs.publish == 'true'
+        # image-tag is operator-supplied, so it goes through the environment
+        # rather than being pasted into the script as a literal.
+        env:
+          PUBLISHED: ${{ inputs.image-tag || 'latest' }}
         run: |
-          image="${REGISTRY}/${IMAGE}:${{ inputs.image-tag || 'latest' }}"
+          image="${REGISTRY}/${IMAGE}:${PUBLISHED}"
           docker pull --platform linux/amd64 "$image"
           docker run -d --name jev -p 8000:8000 "$image"
 
@@ -137,15 +141,22 @@ jobs:
           docker rm -f jev
 
       - name: Summary
+        # The tag list is a multi-line output, and a ${{ }} expansion is
+        # pasted into the script verbatim: every line after the first would be
+        # run as its own command.  Passing it through the environment keeps
+        # it as one inert value.
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          PUBLISHED: ${{ inputs.image-tag || 'latest' }}
         run: |
           {
             echo "### Container image"
             echo
             echo '```bash'
-            echo "docker pull ${REGISTRY}/${IMAGE}:${{ inputs.image-tag || 'latest' }}"
+            echo "docker pull ${REGISTRY}/${IMAGE}:${PUBLISHED}"
             echo '```'
             echo
             echo '```'
-            ${{ steps.meta.outputs.tags }}
+            echo "${TAGS}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
