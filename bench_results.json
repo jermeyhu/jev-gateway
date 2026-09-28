@@ -1,0 +1,296 @@
+[
+  {
+    "case": "healthy_canary",
+    "truth": {
+      "is_incident": false,
+      "severity": "sev3",
+      "action": "wait"
+    },
+    "gw_pred": {
+      "is_incident": false,
+      "severity": "sev1",
+      "action": "wait"
+    },
+    "dr_pred": {
+      "is_incident": false,
+      "severity": "sev1",
+      "action": "wait"
+    },
+    "gw_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": true
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": true
+    },
+    "agree": {
+      "is_incident": true,
+      "severity": true,
+      "action": true
+    },
+    "gw_ms": 5027.886199997738,
+    "dr_ms": 4453.200899995863,
+    "noul_p": 0.15035772213038245,
+    "gw_usage": {
+      "input_tokens": 583,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 54,
+      "prompt_tokens": 596,
+      "total_tokens": 650,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  },
+  {
+    "case": "provider_outage",
+    "truth": {
+      "is_incident": true,
+      "severity": "sev1",
+      "action": "failover"
+    },
+    "gw_pred": {
+      "is_incident": true,
+      "severity": "sev1",
+      "action": "failover"
+    },
+    "dr_pred": {
+      "is_incident": true,
+      "severity": "sev3",
+      "action": "investigate"
+    },
+    "gw_correct": {
+      "is_incident": true,
+      "severity": true,
+      "action": true
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "agree": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "gw_ms": 5219.349600025453,
+    "dr_ms": 4564.248200040311,
+    "noul_p": 0.6225162412256808,
+    "gw_usage": {
+      "input_tokens": 601,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 55,
+      "prompt_tokens": 602,
+      "total_tokens": 657,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  },
+  {
+    "case": "memory_leak_after_deploy",
+    "truth": {
+      "is_incident": true,
+      "severity": "sev2",
+      "action": "rollback"
+    },
+    "gw_pred": {
+      "is_incident": true,
+      "severity": "sev1",
+      "action": "wait"
+    },
+    "dr_pred": {
+      "is_incident": true,
+      "severity": "sev2",
+      "action": "investigate"
+    },
+    "gw_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": true,
+      "action": false
+    },
+    "agree": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "gw_ms": 5253.3963999012485,
+    "dr_ms": 4539.850499946624,
+    "noul_p": 0.5416091702841205,
+    "gw_usage": {
+      "input_tokens": 619,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 55,
+      "prompt_tokens": 610,
+      "total_tokens": 665,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  },
+  {
+    "case": "db_slow_queries",
+    "truth": {
+      "is_incident": true,
+      "severity": "sev2",
+      "action": "investigate"
+    },
+    "gw_pred": {
+      "is_incident": false,
+      "severity": "sev1",
+      "action": "wait"
+    },
+    "dr_pred": {
+      "is_incident": true,
+      "severity": "sev2",
+      "action": "investigate"
+    },
+    "gw_correct": {
+      "is_incident": false,
+      "severity": false,
+      "action": false
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": true,
+      "action": true
+    },
+    "agree": {
+      "is_incident": false,
+      "severity": false,
+      "action": false
+    },
+    "gw_ms": 5423.2488999841735,
+    "dr_ms": 4670.895399991423,
+    "noul_p": 0.413513229847832,
+    "gw_usage": {
+      "input_tokens": 634,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 55,
+      "prompt_tokens": 617,
+      "total_tokens": 672,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  },
+  {
+    "case": "campaign_traffic_spike",
+    "truth": {
+      "is_incident": false,
+      "severity": "sev3",
+      "action": "wait"
+    },
+    "gw_pred": {
+      "is_incident": false,
+      "severity": "sev1",
+      "action": "wait"
+    },
+    "dr_pred": {
+      "is_incident": false,
+      "severity": "sev2",
+      "action": "investigate"
+    },
+    "gw_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": true
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "agree": {
+      "is_incident": true,
+      "severity": false,
+      "action": false
+    },
+    "gw_ms": 5603.752299910411,
+    "dr_ms": 4906.453999923542,
+    "noul_p": 0.3739003734205779,
+    "gw_usage": {
+      "input_tokens": 640,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 55,
+      "prompt_tokens": 619,
+      "total_tokens": 674,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  },
+  {
+    "case": "region_failover_partial",
+    "truth": {
+      "is_incident": true,
+      "severity": "sev1",
+      "action": "failover"
+    },
+    "gw_pred": {
+      "is_incident": true,
+      "severity": "sev1",
+      "action": "failover"
+    },
+    "dr_pred": {
+      "is_incident": true,
+      "severity": "sev2",
+      "action": "failover"
+    },
+    "gw_correct": {
+      "is_incident": true,
+      "severity": true,
+      "action": true
+    },
+    "dr_correct": {
+      "is_incident": true,
+      "severity": false,
+      "action": true
+    },
+    "agree": {
+      "is_incident": true,
+      "severity": false,
+      "action": true
+    },
+    "gw_ms": 5015.335600008257,
+    "dr_ms": 4485.767300007865,
+    "noul_p": 0.5189118720222476,
+    "gw_usage": {
+      "input_tokens": 604,
+      "output_tokens": 3
+    },
+    "dr_usage": {
+      "completion_tokens": 55,
+      "prompt_tokens": 603,
+      "total_tokens": 658,
+      "prompt_tokens_details": {
+        "cached_tokens": 479
+      }
+    },
+    "dr_parsed": true
+  }
+]

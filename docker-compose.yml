@@ -1,0 +1,42 @@
+# Jev Gateway, gateway only.
+#
+#   docker compose up -d
+#
+# The backend is not started here: point backend.base_url in config.yaml at a
+# server you run yourself, then bring the gateway up.  For a self-contained
+# stack that also starts an inference server, use one of the templates next to
+# this file -- each bundles the gateway plus one backend:
+#
+#   docker-compose.llamacpp.yml    gateway + llama.cpp (local .gguf)
+#   docker-compose.vllm.yml        gateway + vLLM
+#   docker-compose.sglang.yml      gateway + SGLang
+#
+# config.yaml is mounted over /app/config.yaml.  It is the only configuration
+# there is, so edit backend.base_url to point at your server.
+
+name: jev-gateway
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jev-gateway:0.1.0
+    ports:
+      - "8000:8000"
+    environment:
+      JEV_GATEWAY_CONFIG: /app/config.yaml
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+

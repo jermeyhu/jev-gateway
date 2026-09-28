@@ -1,0 +1,89 @@
+# llama.cpp template: gateway + llama.cpp, sharing one .gguf on disk.
+#
+#   mkdir -p models
+#   # copy your .gguf (and the mmproj for vision models) into ./models
+#   docker compose -f docker-compose.llamacpp.yml up -d
+#
+# config.yaml is mounted over /app/config.yaml.  Edit it so backend.base_url is
+# the service name below -- inside a container 127.0.0.1 is the gateway's own
+# loopback, not llama-server's.  backend.type stays "openai".
+
+name: jev-gateway-llamacpp
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jev-gateway:0.1.0
+    ports:
+      - "8000:8000"
+    environment:
+      JEV_GATEWAY_CONFIG: /app/config.yaml
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    depends_on:
+      llama-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  llama-server:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    ports:
+      # Exposed for debugging; the gateway reaches it over the compose network.
+      - "8080:8080"
+    volumes:
+      - ./models:/models:ro
+    command:
+      - -m
+      - /models/model.gguf
+      # Vision models only: uncomment and point at the matching projector.
+      # - --mmproj
+      # - /models/mmproj.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      # Total context.  --kv-unified makes all 4 slots share it, so one request
+      # may use all of it instead of being pinned to 1/4.
+      - -c
+      - "8192"
+      - -np
+      - "4"
+      - --kv-unified
+      # The gateway sends max_tokens: 1 and reads logprobs, so prompt cache
+      # reuse is what makes a per-question forward pass cheap.
+      - --cache-prompt
+      # Required: the gateway relies on the model's own chat template.
+      - --jinja
+      - --no-webui
+    # Uncomment for NVIDIA GPU acceleration (needs nvidia-container-toolkit).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8080/health
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Model load can take a while on first boot.
+      start_period: 120s
+    restart: unless-stopped

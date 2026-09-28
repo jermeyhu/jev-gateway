@@ -1,0 +1,9 @@
+# Toolchain for building the GitHub Pages site with MkDocs.
+# Kept out of pyproject.toml so the runtime install stays minimal and the
+# docs build stays reproducible in CI.
+mkdocs>=1.6
+mkdocs-material>=9.5
+mkdocs-material-extensions>=1.3
+mkdocs-static-i18n>=1.3
+pymdown-extensions>=10.9
+pyyaml>=6.0

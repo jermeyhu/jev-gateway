@@ -1,0 +1,104 @@
+# Jev Gateway configuration.
+#
+# This is the only configuration there is.  The compose stacks all mount it over
+# /app/config.yaml, so pointing the gateway at a different server means editing
+# backend.base_url below -- nothing else changes.
+#
+# The gateway speaks exactly one wire protocol: the OpenAI chat-completions API
+# (POST /v1/chat/completions with logprobs).  Any server that implements it
+# works -- llama.cpp, vLLM, SGLang, Ollama, LM Studio, TGI, a hosted API -- and
+# no engine-specific option is ever sent.
+#
+#   backend.base_url   where the server is
+#
+#   llama.cpp   host:    http://127.0.0.1:8080
+#               compose: http://llama-server:8080
+#   vLLM        host:    http://127.0.0.1:8001
+#               compose: http://vllm:8000
+#   SGLang      host:    http://127.0.0.1:8002
+#               compose: http://sglang:30000
+#
+# "host" is for running the gateway outside Docker; "compose" is for the
+# gateway container, where 127.0.0.1 is the gateway's own loopback, so the
+# address has to be the neighbouring service name.  To reach a server on the
+# Docker host instead, use http://host.docker.internal:<port>.
+#
+# The only other environment variable is JEV_GATEWAY_CONFIG, which points at
+# this file; leave it alone unless you mount the file somewhere else.
+
+server:
+  host: 0.0.0.0
+  port: 8000
+
+backend:
+  # The only supported protocol.  Kept explicit so the config file says what it
+  # speaks; a future protocol would add a new value here.
+  type: openai
+  base_url: http://127.0.0.1:8080
+  # Reported back to clients as "model".  Leave null to let the gateway ask the
+  # server what it loaded (via /v1/models); set it to the server's served model
+  # name if the server requires one on every request.
+  model: null
+  api_key: null
+  timeout_seconds: 30.0
+  max_concurrency: 32
+  # How many next-token logprobs to read back (16-4096).  A candidate letter
+  # outside the returned window is floored and the question is reported as
+  # truncated.  64 is plenty for the 16-candidate limit.
+  top_logprobs: 128
+  # null = auto (assume the backend accepts images), true / false to force.
+  supports_images: null
+  extra_headers: {}
+  # Extra top-level fields merged into every /v1/chat/completions request.
+  # Empty by default, so nothing engine-specific goes on the wire.  Set it to
+  # opt into a server knob; the one you usually want is turning a *reasoning*
+  # model's thinking OFF.  A thinking model emits "Thinking" as its first
+  # token, so no candidate letter is in the top-N window and every question
+  # fails with BACKEND_PROTOCOL_ERROR.  Providers spell the switch differently,
+  # so the value is passed through verbatim -- pick your backend:
+  #
+  #   llama.cpp (Qwen3 / Qwen3.5, Gemma 3, ...):
+  #     extra_body:
+  #       chat_template_kwargs: {enable_thinking: false}
+  #   vLLM (Qwen3, Qwen3-VL):
+  #     extra_body:
+  #       chat_template_kwargs: {enable_thinking: false}
+  #   SGLang (Qwen3, ...):
+  #     extra_body:
+  #       chat_template_kwargs: {enable_thinking: false}
+  #   OpenAI o-series / GPT-5:
+  #     extra_body:
+  #       reasoning_effort: none
+  #   OpenRouter (unified, any reasoning model):
+  #     extra_body:
+  #       reasoning: {enabled: false}
+  #   DeepSeek (deepseek-reasoner has no off switch; use deepseek-chat instead
+  #   and leave this empty):
+  #     extra_body: {}
+  #
+  # Set this to {} for a non-reasoning model.  These keys never override
+  # messages / max_tokens / logprobs / top_logprobs.
+  #
+  # The value below is the llama.cpp recipe, matching the Qwen3.5 model this
+  # file points at.  Swap it for your backend's line above.
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: false
+
+request:
+  max_questions: 64
+  total_timeout_seconds: 60.0
+  # fused = one user message (byte compatible with the reference gateway)
+  # split = evidence in its own user message so backends can reuse the prompt cache
+  prompt_layout: fused
+
+multimodal:
+  enabled: true
+  max_images: 4
+  max_image_bytes: 5242880
+  allow_remote_urls: false
+  allowed_mime_prefixes:
+    - image/
+
+logging:
+  level: INFO

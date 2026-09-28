@@ -1,0 +1,143 @@
+site_name: Jev Gateway
+site_description: >-
+  A self-hosted, Jev / System One compatible decision gateway that runs the
+  decision layer on any OpenAI-compatible server and adds local image input.
+site_author: jermeyhu
+site_url: https://jermeyhu.github.io/jev-gateway/
+repo_url: https://github.com/jermeyhu/jev-gateway
+repo_name: jermeyhu/jev-gateway
+edit_uri: edit/main/docs/
+copyright: Apache-2.0 licensed &mdash; modelled on David-Lolly/Jev-Compatible
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.tabs.link
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jermeyhu/jev-gateway
+      name: Source code on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/jev-gateway/
+      name: Package on PyPI
+    - icon: fontawesome/solid/globe
+      link: https://github.com/David-Lolly/Jev-Compatible
+      name: Reference implementation
+
+plugins:
+  - search:
+      lang:
+        - en
+        - zh
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+          site_name: Jev Gateway
+          nav_translations:
+            Home: Home
+            Quick start: Quick start
+            How it works: How it works
+            API reference: API reference
+            Configuration: Configuration
+            Backends: Backends
+            Images: Images
+            Scripts: Scripts
+            Limits & FAQ: Limits & FAQ
+            Development: Development
+        - locale: zh
+          name: 简体中文
+          build: true
+          site_name: Jev Gateway
+          nav_translations:
+            Home: 首页
+            Quick start: 快速开始
+            How it works: 工作方式
+            API reference: 接口参考
+            Configuration: 配置参考
+            Backends: 后端
+            Images: 图片
+            Scripts: 脚本
+            Limits & FAQ: 限制与 FAQ
+            Development: 开发
+
+nav:
+  - Home: index.md
+  - Quick start: quick-start.md
+  - How it works: how-it-works.md
+  - API reference: api.md
+  - Configuration: configuration.md
+  - Backends: backends.md
+  - Images: images.md
+  - Scripts: scripts.md
+  - Limits & FAQ: limits.md
+  - Development: development.md
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
