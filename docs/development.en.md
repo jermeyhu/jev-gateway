@@ -36,31 +36,30 @@ validation down to logprob parsing is exercised for real.
 ```
 app/
   main.py            FastAPI app, request-id middleware, error handlers, endpoints
-  config.py          frozen settings dataclasses, strict YAML loading
+  config.py          frozen settings dataclasses, strict environment parsing
   service.py         wiring backend + engine + coordinator, request → response
   schemas/           request and response models
   decision/          prompt building, the engine, the coordinator, the task IR
   primitives/        question types → lettered candidates
   backends/          the one OpenAI-compatible backend
   utils/             errors, image parsing, softmax
-scripts/             HTTP-only tools; none of them import the app
 tests/               pytest suite
 ```
 
-The layering is deliberate: `scripts/` never imports `app/`, so every tool can be pointed
-at a remote gateway. `backends/` knows nothing about questions, and `primitives/` knows
-nothing about HTTP.
+The layering is deliberate: `backends/` knows nothing about questions, `primitives/`
+knows nothing about HTTP, and `tests/` never touch the network.
 
 ## Working on the gateway
 
 ```bash
-JEV_GATEWAY_CONFIG=config.local.yaml python -m app
+set -a; . ./.env; set +a
+python -m app
 # or the console script, equivalent
 jev-gateway
 ```
 
-VS Code tasks are available for `Test`, `Lint`, `Type check`, `Check all`, `Run gateway`,
-`Smoke test` and `Validate compose YAML`.
+VS Code tasks are available for `Test`, `Lint`, `Type check`, `Check all`, `Run gateway`
+and `Validate compose YAML`.
 
 ## Working on this site
 

@@ -35,29 +35,29 @@ HTTP 传输层换掉。替身服务说的是标准 OpenAI chat-completions 契�
 ```
 app/
   main.py            FastAPI app、request-id 中间件、错误处理器、端点
-  config.py          冻结的 settings dataclass、严格的 YAML 加载
+  config.py          冻结的 settings dataclass、严格的环境变量解析
   service.py         把 backend + engine + coordinator 接线，请求 → 响应
   schemas/           请求与响应模型
   decision/          prompt 构建、引擎、协调器、任务 IR
   primitives/        问题类型 → 带字母的候选
   backends/          唯一的 OpenAI 兼容后端
   utils/             错误、图片解析、softmax
-scripts/             纯 HTTP 工具；没有任何一个 import app
 tests/               pytest 套件
 ```
 
-分层是刻意的：`scripts/` 从不 import `app/`，所以每个工具都能指向远端网关；`backends/`
-不知道问题的存在，`primitives/` 不知道 HTTP 的存在。
+分层是刻意的：`backends/` 不知道问题的存在，`primitives/` 不知道 HTTP 的存在，
+`tests/` 不碰网络。
 
 ## 开发网关 {#working-on-the-gateway}
 
 ```bash
-JEV_GATEWAY_CONFIG=config.local.yaml python -m app
+set -a; . ./.env; set +a
+python -m app
 # 或者等价的控制台脚本
 jev-gateway
 ```
 
-VS Code 里已有 `Test`、`Lint`、`Type check`、`Check all`、`Run gateway`、`Smoke test`
+VS Code 里已有 `Test`、`Lint`、`Type check`、`Check all`、`Run gateway`
 和 `Validate compose YAML` 等任务。
 
 ## 开发本站文档 {#working-on-this-site}

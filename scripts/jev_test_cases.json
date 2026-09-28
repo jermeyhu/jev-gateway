@@ -1,0 +1,700 @@
+{
+  "description": "jev-gateway 决策问答测试集。每条用例包含真实任务描述、标准答案、网关请求参数，以及等价的真实大模型 tool-calling 请求参数。",
+  "endpoint": "POST /v1/systemone",
+  "cases": [
+    {
+      "真实任务描述": "客服邮箱收到下面这封来信。发件人 li.wei@customer.cn；主题「订单 ORD-88213 重复扣款两次」；正文「我昨天买了年费套餐，信用卡被扣了两笔 1999 元。客服电话一直打不通，请尽快处理，我要退款。」；客户等级 gold；命中关键词【重复扣款】【退款】；当前没有关联工单。问题：这封来信必须转接人工客服处理，还是可以用自动回复模板应付？两个选项的定义是 —— A 转人工客服：涉及资金争议、重复扣款、法律风险，或客户明确要求人工；B 自动回复模板：一般咨询、无资金争议、无投诉升级。只能二选一。",
+      "问题的答案": "true —— 需要转人工客服（criteria.true）",
+      "网关请求参数": {
+        "state": {
+          "from": "li.wei@customer.cn",
+          "subject": "订单 ORD-88213 重复扣款两次",
+          "body": "我昨天买了年费套餐，信用卡被扣了两笔 1999 元。客服电话一直打不通，请尽快处理，我要退款。",
+          "received_at": "2026-09-28T09:14:00+08:00",
+          "vip_level": "gold",
+          "open_ticket_count": 0,
+          "keywords_hit": ["重复扣款", "退款"]
+        },
+        "questions": {
+          "needs_human_handoff": {
+            "type": "noul",
+            "instructions": "判断这封来信必须转接人工客服，还是可以用自动回复模板应付。转人工客服：涉及资金争议、重复扣款、法律风险，或客户明确要求人工。自动回复模板：一般咨询、无资金争议、无投诉升级。只能二选一。",
+            "criteria": {
+              "true": "转人工客服：涉及资金争议、重复扣款、法律风险，或客户明确要求人工",
+              "false": "自动回复模板：一般咨询、无资金争议、无投诉升级"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是邮件分诊助手。判断这封来信必须转人工客服还是可以自动回复，并调用提供的工具给出结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"from\": \"li.wei@customer.cn\", \"subject\": \"订单 ORD-88213 重复扣款两次\", \"body\": \"我昨天买了年费套餐，信用卡被扣了两笔 1999 元。客服电话一直打不通，请尽快处理，我要退款。\", \"vip_level\": \"gold\", \"open_ticket_count\": 0, \"keywords_hit\": [\"重复扣款\", \"退款\"]}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "decide_handoff",
+              "description": "判断邮件是否必须转人工客服，还是可以自动回复",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "needs_human_handoff": {
+                    "type": "boolean",
+                    "description": "true 表示必须转人工客服；false 表示可用自动回复模板"
+                  }
+                },
+                "required": ["needs_human_handoff"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "decide_handoff" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "客服邮箱收到下面这封来信。发件人 ops@northwind.com；主题「发票抬头变更申请」；正文「请把 ORD-88213 的发票抬头从个人改成杭州北望科技有限公司，并补开增值税专用发票。」；附件 invoice_88213.pdf；命中关键词【发票】【抬头】【增值税】。问题：这封来信该分派给哪一组同事接手？候选队列共四个，只能选一个 —— A billing 账单与付款：发票、退款、扣款、订阅续费、合同金额；B technical 技术支持：登录失败、报错、API 报错、数据异常；C sales 销售与商务：合作提案、报价、合同谈判、试用申请；D hr 人力资源：简历、offer、社保、薪酬、劳动关系。",
+      "问题的答案": "billing —— 账单与付款（criteria.billing）",
+      "网关请求参数": {
+        "state": {
+          "from": "ops@northwind.com",
+          "subject": "发票抬头变更申请",
+          "body": "请把 ORD-88213 的发票抬头从个人改成杭州北望科技有限公司，并补开增值税专用发票。",
+          "attachments": ["invoice_88213.pdf"],
+          "keywords_hit": ["发票", "抬头", "增值税"]
+        },
+        "questions": {
+          "queue": {
+            "type": "choice",
+            "instructions": "把这封来信分派到最合适的处理队列，只能选一个。billing 账单与付款：发票、退款、扣款、订阅续费、合同金额。technical 技术支持：登录失败、报错、API 报错、数据异常。sales 销售与商务：合作提案、报价、合同谈判、试用申请。hr 人力资源：简历、offer、社保、薪酬、劳动关系。",
+            "criteria": {
+              "billing": "账单与付款：发票、退款、扣款、订阅续费、合同金额",
+              "technical": "技术支持：登录失败、报错、API 报错、数据异常",
+              "sales": "销售与商务：合作提案、报价、合同谈判、试用申请",
+              "hr": "人力资源：简历、offer、社保、薪酬、劳动关系"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是邮件分诊助手。判断这封来信该分派到哪个处理队列，并调用提供的工具给出结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"from\": \"ops@northwind.com\", \"subject\": \"发票抬头变更申请\", \"body\": \"请把 ORD-88213 的发票抬头从个人改成杭州北望科技有限公司，并补开增值税专用发票。\", \"keywords_hit\": [\"发票\", \"抬头\", \"增值税\"]}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "assign_queue",
+              "description": "把邮件分派到处理队列，候选为 billing / technical / sales / hr",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "queue": {
+                    "type": "string",
+                    "enum": ["billing", "technical", "sales", "hr"],
+                    "description": "处理队列"
+                  }
+                },
+                "required": ["queue"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "assign_queue" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "在线客服收到用户这句话：我上个月买的专业版能不能和服务版合并成一个订阅？两个加起来比单独买便宜吗？检索侧的上下文是：候选意图 [pricing, account]，FAQ 命中分 0.21，规则引擎置信度 0.34，含比较型提问 true，已进行 3 轮对话。问题：回答这句话必须调用大模型，还是 FAQ 检索或固定规则就能应付？两个选项的定义是 —— A 必须调用大模型：需要比较、多步推理、结合多轮上下文，或涉及规则无法覆盖的开放问题；B 不需要大模型：FAQ 库可直接命中，或固定规则/关键词即可作答。只能二选一。",
+      "问题的答案": "true —— 必须调用大模型（criteria.true）",
+      "网关请求参数": {
+        "state": {
+          "utterance": "我上个月买的专业版能不能和服务版合并成一个订阅？两个加起来比单独买便宜吗？",
+          "intent_candidates": ["pricing", "account"],
+          "faq_hit_score": 0.21,
+          "rule_engine_confidence": 0.34,
+          "contains_computation": true,
+          "context_turns": 3
+        },
+        "questions": {
+          "needs_llm": {
+            "type": "noul",
+            "instructions": "判断回答这句话必须调用大模型，还是 FAQ 检索或固定规则即可应付。必须调用大模型：需要比较、多步推理、结合多轮上下文，或涉及规则无法覆盖的开放问题。不需要大模型：FAQ 库可直接命中，或固定规则/关键词即可作答。只能二选一。",
+            "criteria": {
+              "true": "必须调用大模型：需要比较、多步推理、结合多轮上下文，或涉及规则无法覆盖的开放问题",
+              "false": "不需要大模型：FAQ 库可直接命中，或固定规则/关键词即可作答"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是一个 LLM 路由决策器。判断回答这句话是否值得调用大模型，并调用提供的工具给出结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"utterance\": \"我上个月买的专业版能不能和服务版合并成一个订阅？两个加起来比单独买便宜吗？\", \"intent_candidates\": [\"pricing\", \"account\"], \"faq_hit_score\": 0.21, \"rule_engine_confidence\": 0.34, \"contains_computation\": true, \"context_turns\": 3}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "decide_llm_routing",
+              "description": "判断回答这句话是否必须调用大模型",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "needs_llm": {
+                    "type": "boolean",
+                    "description": "true 表示必须调用大模型；false 表示 FAQ 或规则即可"
+                  },
+                  "matched_intent": {
+                    "type": "string",
+                    "description": "命中的意图"
+                  }
+                },
+                "required": ["needs_llm"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "decide_llm_routing" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "网关已经确认这条请求需要调用大模型，现在要在满足延迟和成本约束的前提下挑一个具体模型规格。待处理请求的画像是：把「已读回执」这个功能补一段帮助文档；预计输入 320 tokens，预计输出 80 tokens；不需要代码生成，不需要多模态；延迟 SLA 800 毫秒；月调用量 480000。候选可选的模型只有这四个，只能选一个 —— A qwen3-235b-a22b 旗舰模型：适合复杂推理、多步代码生成、长上下文理解；B qwen3-32b 均衡模型：适合中等复杂度的生成、改写与问答；C qwen3.5-0.8b 轻量模型：适合分类、抽取、摘要、简单改写等单步任务；D none 不调用任何模型：用模板或缓存直接返回。",
+      "问题的答案": "qwen3.5-0.8b —— 轻量模型即可（criteria.qwen3.5-0.8b）",
+      "网关请求参数": {
+        "state": {
+          "request_summary": "把「已读回执」这个功能补一段帮助文档",
+          "estimated_input_tokens": 320,
+          "estimated_output_tokens": 80,
+          "requires_code_generation": false,
+          "requires_multimodal": false,
+          "latency_sla_ms": 800,
+          "monthly_calls": 480000,
+          "available_models": [
+            { "id": "qwen3-235b-a22b", "tier": "large" },
+            { "id": "qwen3-32b", "tier": "mid" },
+            { "id": "qwen3.5-0.8b", "tier": "small" }
+          ]
+        },
+        "questions": {
+          "model_id": {
+            "type": "choice",
+            "instructions": "在候选模型中挑一个最合适的，在满足 800 毫秒延迟 SLA 和成本约束的前提下尽量省。qwen3-235b-a22b 旗舰模型：适合复杂推理、多步代码生成、长上下文理解。qwen3-32b 均衡模型：适合中等复杂度的生成、改写与问答。qwen3.5-0.8b 轻量模型：适合分类、抽取、摘要、简单改写等单步任务。none 不调用任何模型：用模板或缓存直接返回。只能选一个。",
+            "criteria": {
+              "qwen3-235b-a22b": "旗舰模型：适合复杂推理、多步代码生成、长上下文理解",
+              "qwen3-32b": "均衡模型：适合中等复杂度的生成、改写与问答",
+              "qwen3.5-0.8b": "轻量模型：适合分类、抽取、摘要、简单改写等单步任务",
+              "none": "不调用任何模型：用模板或缓存直接返回"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是一个 LLM 路由器。在候选模型中挑选最合适的一个，并调用提供的工具返回结果。"
+          },
+          {
+            "role": "user",
+            "content": "{\"request_summary\": \"把「已读回执」这个功能补一段帮助文档\", \"estimated_input_tokens\": 320, \"estimated_output_tokens\": 80, \"requires_code_generation\": false, \"requires_multimodal\": false, \"latency_sla_ms\": 800, \"monthly_calls\": 480000, \"available_models\": [\"qwen3-235b-a22b\", \"qwen3-32b\", \"qwen3.5-0.8b\"]}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "route_model",
+              "description": "挑选模型规格",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "model_id": {
+                    "type": "string",
+                    "enum": ["qwen3-235b-a22b", "qwen3-32b", "qwen3.5-0.8b", "none"],
+                    "description": "选中的模型标识，none 表示不调用模型"
+                  }
+                },
+                "required": ["model_id"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "route_model" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "财务审批链的第一道判断。单据 EXP-2026-0912 的明细：金额 48600 元人民币，类别为云基础设施，申请人是部门经理，所属部门研发中心，该部门预算剩余比例 13%，已附合同，发票已核验。公司制度规定：部门经理的审批权限上限为 20000 元，且当预算剩余比例低于 15% 时一律不得自行放行。问题：这笔支出是仍在部门经理权限内、可以经理直接批准，还是必须升级到财务总监？两个选项的定义是 —— A 需要财务总监：金额超过经理权限上限 20000 元，或预算剩余比例低于 15%；B 经理权限内：金额在授权额度内且预算充足。只能二选一。",
+      "问题的答案": "true —— 需要财务总监审批（criteria.true）",
+      "网关请求参数": {
+        "state": {
+          "expense_id": "EXP-2026-0912",
+          "amount": 48600,
+          "currency": "CNY",
+          "category": "cloud_infrastructure",
+          "applicant_level": "manager",
+          "department": "研发中心",
+          "budget_remaining_ratio": 0.13,
+          "manager_authority_limit": 20000,
+          "has_contract": true,
+          "invoice_verified": true
+        },
+        "questions": {
+          "needs_director": {
+            "type": "noul",
+            "instructions": "判断这笔支出仍在部门经理权限内，还是必须升级到财务总监。需要财务总监：金额超过经理权限上限 20000 元，或预算剩余比例低于 15%。经理权限内：金额在授权额度内且预算充足。只能二选一。",
+            "criteria": {
+              "true": "需要财务总监：金额超过经理权限上限 20000 元，或预算剩余比例低于 15%",
+              "false": "经理权限内：金额在授权额度内且预算充足"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是财务审批助手。判断这笔支出是经理权限内还是必须升级到财务总监，并调用提供的工具返回结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"expense_id\": \"EXP-2026-0912\", \"amount\": 48600, \"currency\": \"CNY\", \"category\": \"cloud_infrastructure\", \"applicant_level\": \"manager\", \"budget_remaining_ratio\": 0.13, \"manager_authority_limit\": 20000, \"has_contract\": true, \"invoice_verified\": true}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "decide_escalation",
+              "description": "判断是否需要升级到财务总监审批",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "needs_director": {
+                    "type": "boolean",
+                    "description": "true 表示必须升级到财务总监"
+                  },
+                  "approval_route": {
+                    "type": "string",
+                    "enum": ["manager", "director"],
+                    "description": "最终审批人"
+                  }
+                },
+                "required": ["needs_director"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "decide_escalation" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "法务已经把采购合同 CT-2026-0341 审完，反馈到采购部的条款明细如下：对手方上海鼎新信息科技有限公司，合同金额 780000 元，付款条件为预付 70%、验收后付 30%，质保期 3 个月而公司标准是 12 个月，供应商资信等级 B+，已经过法务审阅，合同中没有违约金条款。问题：这份合同的最终审批动作是什么？三个候选动作只能选一个 —— A approve 批准：条款符合标准，预付比例、质保期、资信等级均可接受；B reject 拒绝：存在不可接受的风险，如高预付叠加无质保；C need_info 补充材料：条款偏离标准但可补正，需对方补充后再审。",
+      "问题的答案": "need_info —— 退回补充材料（criteria.need_info）",
+      "网关请求参数": {
+        "state": {
+          "contract_id": "CT-2026-0341",
+          "counterparty": "上海鼎新信息科技有限公司",
+          "amount": 780000,
+          "payment_terms": "预付 70%，验收后付 30%",
+          "warranty_months": 3,
+          "standard_warranty_months": 12,
+          "supplier_credit_rating": "B+",
+          "has_legal_review": true,
+          "penalty_clause_present": false
+        },
+        "questions": {
+          "decision": {
+            "type": "choice",
+            "instructions": "给出这份合同的最终审批动作，只能选一个。approve 批准：条款符合标准，预付比例、质保期、资信等级均可接受。reject 拒绝：存在不可接受的风险，如高预付叠加无质保。need_info 补充材料：条款偏离标准但可补正，需对方补充后再审。",
+            "criteria": {
+              "approve": "批准：条款符合标准，预付比例、质保期、资信等级均可接受",
+              "reject": "拒绝：存在不可接受的风险，如高预付叠加无质保",
+              "need_info": "补充材料：条款偏离标准但可补正，需对方补充后再审"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是合同审批助手。根据条款偏离情况给出审批动作，并调用提供的工具返回结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"contract_id\": \"CT-2026-0341\", \"counterparty\": \"上海鼎新信息科技有限公司\", \"amount\": 780000, \"payment_terms\": \"预付 70%，验收后付 30%\", \"warranty_months\": 3, \"standard_warranty_months\": 12, \"supplier_credit_rating\": \"B+\", \"has_legal_review\": true, \"penalty_clause_present\": false}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "decide_contract_approval",
+              "description": "给出合同审批动作",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": ["approve", "reject", "need_info"],
+                    "description": "审批动作"
+                  },
+                  "deviations": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "偏离标准之处"
+                  }
+                },
+                "required": ["decision"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "decide_contract_approval" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "风控引擎在放款前要给交易 TX-2026-77410 打风险等级，这笔交易的特征是：金额 128000 元，设备指纹此前从未出现过，IP 归属地 CN，账号注册仅 2 天，历史失败订单 0 笔，支付方式信用卡，24 小时内交易 3 笔。问题：应该把它划到哪一档风险等级？三个档位从低到高，只能选最匹配的一档 —— 0 低风险：老账号、同设备、同地区、无失败记录，行为正常；1 中风险：存在单点异常（新设备、多账号、短期新建），但无明确欺诈迹象；2 高风险：命中欺诈特征，或短时间内多笔失败/拒付。",
+      "问题的答案": "1 —— 中风险（criteria[1]；score 为 0 起始的期望索引，满分档时为 2.0）",
+      "网关请求参数": {
+        "state": {
+          "order_id": "TX-2026-77410",
+          "amount": 128000,
+          "device_fingerprint_seen_before": false,
+          "ip_country": "CN",
+          "account_age_days": 2,
+          "prior_order_failures": 0,
+          "payment_method": "信用卡",
+          "velocity_24h_count": 3
+        },
+        "questions": {
+          "risk_level": {
+            "type": "score",
+            "instructions": "给这笔交易打风险等级，三个档位从低到高，选最匹配的一档。低风险：老账号、同设备、同地区、无失败记录，行为正常。中风险：存在单点异常（新设备、多账号、短期新建），但无明确欺诈迹象。高风险：命中欺诈特征，或短时间内多笔失败/拒付。",
+            "criteria": [
+              "低风险：老账号、同设备、同地区、无失败记录，行为正常",
+              "中风险：存在单点异常（新设备、多账号、短期新建），但无明确欺诈迹象",
+              "高风险：命中欺诈特征，或短时间内多笔失败/拒付"
+            ]
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是风控评分助手。给这笔交易打一个风险等级，并调用提供的工具返回。"
+          },
+          {
+            "role": "user",
+            "content": "{\"order_id\": \"TX-2026-77410\", \"amount\": 128000, \"device_fingerprint_seen_before\": false, \"ip_country\": \"CN\", \"account_age_days\": 2, \"prior_order_failures\": 0, \"payment_method\": \"信用卡\", \"velocity_24h_count\": 3}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "score_risk",
+              "description": "交易风险等级评分",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "risk_level": {
+                    "type": "string",
+                    "enum": ["低风险", "中风险", "高风险"],
+                    "description": "风险等级"
+                  },
+                  "risk_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "risk_factors": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "风险因子"
+                  }
+                },
+                "required": ["risk_level"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "score_risk" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "客户成功团队要给投诉工单 TK-5567 定响应 SLA，决定它进入多长的处理时限。工单画像是：客户等级 enterprise，年合同金额 12000000 元，情绪分 0.09（越低越不满），正文明确提到法律诉讼，同时也提到可能流失，已经开启 6 天，30 天内该客户已有 4 张工单。问题：这张工单应该算哪一档严重程度？三个档位从轻到重，只能选最匹配的一档 —— 0 一般：功能疑问或轻微不满，不影响业务，无流失风险；1 重要：业务受影响但有绕行方案，账期未到；2 紧急：业务中断、涉及法律或流失风险、已超响应 SLA。",
+      "问题的答案": "2 —— 紧急（criteria[2]；score 为 0 起始的期望索引，满分档时为 2.0）",
+      "网关请求参数": {
+        "state": {
+          "ticket_id": "TK-5567",
+          "customer_tier": "enterprise",
+          "account_arr": 12000000,
+          "sentiment_score": 0.09,
+          "mentions_legal": true,
+          "mentions_churn": true,
+          "open_days": 6,
+          "prior_tickets_30d": 4
+        },
+        "questions": {
+          "severity": {
+            "type": "score",
+            "instructions": "给这张投诉工单打严重程度，三个档位从轻到重，选最匹配的一档。一般：功能疑问或轻微不满，不影响业务，无流失风险。重要：业务受影响但有绕行方案，账期未到。紧急：业务中断、涉及法律或流失风险、已超响应 SLA。",
+            "criteria": [
+              "一般：功能疑问或轻微不满，不影响业务，无流失风险",
+              "重要：业务受影响但有绕行方案，账期未到",
+              "紧急：业务中断、涉及法律或流失风险、已超响应 SLA"
+            ]
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是客服工单分级助手。给这张投诉工单打严重程度，并调用提供的工具返回。"
+          },
+          {
+            "role": "user",
+            "content": "{\"ticket_id\": \"TK-5567\", \"customer_tier\": \"enterprise\", \"account_arr\": 12000000, \"sentiment_score\": 0.09, \"mentions_legal\": true, \"mentions_churn\": true, \"open_days\": 6, \"prior_tickets_30d\": 4}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "grade_ticket",
+              "description": "工单严重程度分级",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "type": "string",
+                    "enum": ["一般", "重要", "紧急"],
+                    "description": "严重程度"
+                  },
+                  "sla_hours": {
+                    "type": "integer",
+                    "description": "响应时限小时数"
+                  }
+                },
+                "required": ["severity"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "grade_ticket" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "法务在合同签署前要指出这份 SaaS 订阅合同最需要关注的条款风险类型。合同情况是：类型为 saas_subscription；关键条款摘要为供应商赔偿责任上限为过去 12 个月已付费用，且明确排除间接损失与数据泄露责任；我方年度合同价值 360000 元；涉及数据处理；尚未由我方 CFO 签署。问题：最需要关注的条款风险属于哪一类？四类风险只能选一个 —— A liability 责任与赔偿：赔偿上限过低、排除间接损失、责任不对等；B termination 解约与退出：解约条件苛刻、数据迁出无保障、续约自动涨价；C compliance 合规与数据：数据处理协议缺失、跨境传输、审计权缺失；D payment 付款与账期：预付比例过高、账期过长、汇率与发票风险。",
+      "问题的答案": "liability —— 责任与赔偿（criteria.liability）",
+      "网关请求参数": {
+        "state": {
+          "contract_type": "saas_subscription",
+          "clause_summary": "供应商赔偿责任上限为过去 12 个月已付费用，且明确排除间接损失与数据泄露责任。",
+          "our_annual_value": 360000,
+          "data_involved": true,
+          "signed_by_our_cfo": false
+        },
+        "questions": {
+          "top_risk": {
+            "type": "choice",
+            "instructions": "指出这份合同最需要关注的条款风险类型，只能选一个。liability 责任与赔偿：赔偿上限过低、排除间接损失、责任不对等。termination 解约与退出：解约条件苛刻、数据迁出无保障、续约自动涨价。compliance 合规与数据：数据处理协议缺失、跨境传输、审计权缺失。payment 付款与账期：预付比例过高、账期过长、汇率与发票风险。",
+            "criteria": {
+              "liability": "责任与赔偿：赔偿上限过低、排除间接损失、责任不对等",
+              "termination": "解约与退出：解约条件苛刻、数据迁出无保障、续约自动涨价",
+              "compliance": "合规与数据：数据处理协议缺失、跨境传输、审计权缺失",
+              "payment": "付款与账期：预付比例过高、账期过长、汇率与发票风险"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是合同风险审查助手。指出最需要关注的条款风险类型，并调用提供的工具返回。"
+          },
+          {
+            "role": "user",
+            "content": "{\"contract_type\": \"saas_subscription\", \"clause_summary\": \"供应商赔偿责任上限为过去 12 个月已付费用，且明确排除间接损失与数据泄露责任。\", \"our_annual_value\": 360000, \"data_involved\": true, \"signed_by_our_cfo\": false}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "identify_contract_risk",
+              "description": "识别合同主要条款风险",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "top_risk": {
+                    "type": "string",
+                    "enum": ["liability", "termination", "compliance", "payment"],
+                    "description": "主要条款风险类型"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "description": "严重程度"
+                  },
+                  "suggested_redline": {
+                    "type": "string",
+                    "description": "建议修改条款"
+                  }
+                },
+                "required": ["top_risk"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "identify_contract_risk" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    },
+    {
+      "真实任务描述": "社区运营在帖子 POST-90211 发布上线前要判断是否必须走人工复核。帖子信息是：作者历史发帖 12 篇，历史违规 0 次；正文内容为「这个平台的老用户都知道怎么绕过限流，我把方法整理成步骤发出来，新用户照做就行。」；媒体形式为纯文本；机审已打上 circumvent_restriction 标签；被举报 3 次。问题：这条帖子是否需要人工复核后才能上线？两个选项的定义是 —— A 需要人工复核：涉及绕过平台限制、欺诈引导、仇恨言论或侵权内容；B 无需复核：常规内容，未命中任何红线。只能二选一。",
+      "问题的答案": "true —— 需要人工复核（criteria.true）",
+      "网关请求参数": {
+        "state": {
+          "content_id": "POST-90211",
+          "author_history": 12,
+          "author_violation_count": 0,
+          "text": "这个平台的老用户都知道怎么绕过限流，我把方法整理成步骤发出来，新用户照做就行。",
+          "media_types": ["text"],
+          "automated_flags": ["circumvent_restriction"],
+          "reported_count": 3
+        },
+        "questions": {
+          "needs_manual_review": {
+            "type": "noul",
+            "instructions": "判断这条帖子是否需要人工复核后才能上线。需要人工复核：涉及绕过平台限制、欺诈引导、仇恨言论或侵权内容。无需复核：常规内容，未命中任何红线。只能二选一。",
+            "criteria": {
+              "true": "需要人工复核：涉及绕过平台限制、欺诈引导、仇恨言论或侵权内容",
+              "false": "无需复核：常规内容，未命中任何红线"
+            }
+          }
+        }
+      },
+      "大模型toolcall参数": {
+        "model": "qwen3.5\\Qwen3.5-0.8B-UD-Q6_K_XL.gguf",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是社区内容审核助手。判断这条帖子是否需要人工复核，并调用提供的工具返回结论。"
+          },
+          {
+            "role": "user",
+            "content": "{\"content_id\": \"POST-90211\", \"author_history\": 12, \"author_violation_count\": 0, \"text\": \"这个平台的老用户都知道怎么绕过限流，我把方法整理成步骤发出来，新用户照做就行。\", \"media_types\": [\"text\"], \"automated_flags\": [\"circumvent_restriction\"], \"reported_count\": 3}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "flag_for_review",
+              "description": "判断帖子是否需要人工复核",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "needs_manual_review": {
+                    "type": "boolean",
+                    "description": "true 表示需要人工复核后才能上线"
+                  },
+                  "policy_violated": {
+                    "type": "string",
+                    "enum": ["none", "circumvent_restriction", "fraud", "hate", "infringement"],
+                    "description": "命中的红线"
+                  }
+                },
+                "required": ["needs_manual_review"]
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": { "name": "flag_for_review" }
+        },
+        "temperature": 0,
+        "stream": false
+      }
+    }
+  ]
+}

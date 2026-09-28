@@ -84,9 +84,25 @@ curl http://127.0.0.1:8080/props | grep -i vision
 
 ## 测试 {#testing-it}
 
+把图片读成 data URL 直接发：
+
 ```bash
-python scripts/make_test_png.py                      # 一张极小的合法 PNG，不需要 Pillow
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --image shot.png
+curl -s http://127.0.0.1:8000/v1/systemone \
+  -H 'content-type: application/json' \
+  -d "{
+        \"state\": {\"images\": [\"data:image/png;base64,$(base64 -w0 shot.png)\"]},
+        \"questions\": {
+          \"is_screenshot_of_an_error\": {
+            \"type\": \"noul\",
+            \"instructions\": \"Does the image show an error screen?\",
+            \"criteria\": {
+              \"true\": \"an error dialog or stack trace is visible\",
+              \"false\": \"the UI looks normal\"
+            }
+          }
+        }
+      }"
 ```
 
-冒烟脚本会把文件转成 data URL 发送，并断言答案结构仍然正确。见[脚本](scripts.md)。
+若 `answers` 结构完整且 `diagnostics.questions.*.truncated` 为 `false`，说明图片链路是通的。
+对比 `usage.input_tokens` 与不带图时的数值也能看出图片是否真的被编码。

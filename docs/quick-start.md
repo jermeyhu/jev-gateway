@@ -6,35 +6,41 @@
 pip install -e ".[dev]"           # 或 pip install -e .
 ```
 
-需要 Python 3.11 或更新版本。运行时依赖为 `fastapi`、`httpx`、`pydantic`、`pyyaml` 和
+需要 Python 3.11 或更新版本。运行时依赖为 `fastapi`、`httpx`、`pydantic` 和
 `uvicorn[standard]`。
 
 ## 配置 {#configure}
 
+配置全部是 `JEV_` 前缀的环境变量，**没有配置文件**。不设置就用默认值，空环境下也能直接启
+动。想集中管理就用模板：
+
 ```bash
-cp config.yaml config.local.yaml  # 可选，保留仓库里的原文件不动
-$EDITOR config.local.yaml
+cp .env.example .env      # .env 不入库，改它不会污染仓库
+$EDITOR .env
 ```
 
-`JEV_GATEWAY_CONFIG` 是网关唯一读取的环境变量，默认 `./config.yaml`。监听地址取
-`server.host:server.port`（默认 `0.0.0.0:8000`）。
+真正要改的是 `JEV_BACKEND_BASE_URL`——你的 OpenAI 兼容服务的地址：
 
-真正要改的是 `backend.base_url`——你的 OpenAI 兼容服务的地址：
-
-```yaml
-backend:
-  type: openai
-  base_url: http://127.0.0.1:8080
-  model: null          # null = 从服务的 /v1/models 自动探测
+```bash
+JEV_BACKEND_BASE_URL=http://127.0.0.1:8080
+JEV_BACKEND_MODEL=                      # 留空 = 从服务的 /v1/models 自动探测
 ```
+
+全部变量、默认值和取值范围见[配置参考](configuration.md)。监听地址取
+`JEV_SERVER_HOST:JEV_SERVER_PORT`（默认 `0.0.0.0:8000`）。
 
 ## 运行 {#run}
 
 ```bash
-JEV_GATEWAY_CONFIG=config.local.yaml python -m app
+set -a; . ./.env; set +a     # 把 .env 导进当前 shell
+python -m app
 ```
 
-如果已经设置了环境变量，等价的控制台脚本是 `jev-gateway`，不需要在命令行再传配置路径。
+已经 export 好的话，等价的控制台脚本是 `jev-gateway`。配置也可以直接写在命令行上，不建文件：
+
+```bash
+JEV_BACKEND_BASE_URL=http://192.168.1.10:8080 python -m app
+```
 
 确认它活着：
 
@@ -95,19 +101,38 @@ docker compose up -d                                   # 仅网关
 docker compose -f docker-compose.llamacpp.yml up -d    # 网关 + llama-server
 ```
 
-每个模板都挂载同一个 `./config.yaml`；改模型、上下文长度或端口，直接编辑 `command` 段。
-启动后端栈前先把 `.gguf` 放进 `./models`。视觉模型还需要投影权重：在 `llama-server` 命令
-里加 `--mmproj /models/mmproj.gguf`，并用 `GET /props` 确认 `modalities.vision` 为 `true`。
+每个模板都通过 `environment:` 传配置，**不挂载任何文件**。改后端地址就改那个变量；改模型、
+上下文长度或端口，直接编辑 `command` 段。启动后端栈前先把 `.gguf` 放进 `./models`。视觉模型
+还需要投影权重：在 `llama-server` 命令里加 `--mmproj /models/mmproj.gguf`，并用
+`GET /props` 确认 `modalities.vision` 为 `true`。
 
 ## 端到端验证 {#verify-end-to-end}
 
 ```bash
-python scripts/smoke_test.py --url http://127.0.0.1:8000
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
+curl -s http://127.0.0.1:8000/healthz
+curl -s http://127.0.0.1:8000/readyz
+
+curl -s http://127.0.0.1:8000/v1/systemone \
+  -H 'content-type: application/json' \
+  -d '{
+        "state": {"error_rate": 0.31, "p99_latency_ms": 4100},
+        "questions": {
+          "severity": {
+            "type": "choice",
+            "instructions": "Pick the severity.",
+            "criteria": {
+              "sev1": "error_rate >= 0.20",
+              "sev2": "error_rate >= 0.05 but < 0.20",
+              "sev3": "error_rate < 0.05"
+            }
+          }
+        }
+      }'
 ```
 
-冒烟脚本会访问 `/healthz`、`/readyz` 和 `/v1/systemone`，校验每个答案的结构是否正确，并
-打印 usage 与 diagnostics。
+`/healthz` 证明进程活着，`/readyz` 证明后端已就绪并返回它加载的模型名，最后一个请求
+会返回答案、`usage` 与 `diagnostics`。带图验证把 `state` 换成
+`{"images": ["data:image/png;base64,..."]}`。
 
 !!! note "vLLM 与 SGLang"
 

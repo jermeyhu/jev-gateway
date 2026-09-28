@@ -87,10 +87,26 @@ and multiple questions, use `split`.
 
 ## Testing it
 
+Read the file into a data URL and send it directly:
+
 ```bash
-python scripts/make_test_png.py                      # a tiny valid PNG, no Pillow needed
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --image shot.png
+curl -s http://127.0.0.1:8000/v1/systemone \
+  -H 'content-type: application/json' \
+  -d "{
+        \"state\": {\"images\": [\"data:image/png;base64,$(base64 -w0 shot.png)\"]},
+        \"questions\": {
+          \"is_screenshot_of_an_error\": {
+            \"type\": \"noul\",
+            \"instructions\": \"Does the image show an error screen?\",
+            \"criteria\": {
+              \"true\": \"an error dialog or stack trace is visible\",
+              \"false\": \"the UI looks normal\"
+            }
+          }
+        }
+      }"
 ```
 
-The smoke test sends a data URL built from the file and asserts that the answer still comes
-back with the right shape. See [Scripts](scripts).
+If `answers` has the right shape and `diagnostics.questions.*.truncated` is `false`, the
+image path works. Comparing `usage.input_tokens` against a run without images also shows
+whether the picture was actually encoded.

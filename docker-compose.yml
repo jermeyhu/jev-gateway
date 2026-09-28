@@ -2,19 +2,22 @@
 #
 #   docker compose up -d
 #
-# The backend is not started here: point backend.base_url in config.yaml at a
-# server you run yourself, then bring the gateway up.  For a self-contained
-# stack that also starts an inference server, use the template next to this
-# file, which bundles the gateway plus a local llama.cpp server:
+# The backend is not started here: set JEV_BACKEND_BASE_URL to a server you run
+# yourself, then bring the gateway up.  For a self-contained stack that also
+# starts an inference server, use the template next to this file, which bundles
+# the gateway plus a local llama.cpp server:
 #
 #   docker-compose.llamacpp.yml    gateway + llama.cpp (local .gguf)
 #
 # Only that llama.cpp stack ships here.  To use vLLM or SGLang, start the server
-# yourself and edit backend.base_url (and backend.model, if the server requires
-# a served model name) in config.yaml.
+# yourself and edit JEV_BACKEND_BASE_URL (and JEV_BACKEND_MODEL, if the server
+# requires a served model name) in the `environment:` block below.
 #
-# config.yaml is mounted over /app/config.yaml.  It is the only configuration
-# there is, so edit backend.base_url to point at your server.
+# Every setting is an environment variable, so there is no config file to copy
+# and nothing to mount.  Copy this file to docker-compose.override.yml to keep
+# your own endpoints and keys out of version control, or export a .env file:
+#
+#   cp docker-compose.yml docker-compose.override.yml
 
 name: jev-gateway
 
@@ -27,9 +30,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      JEV_GATEWAY_CONFIG: /app/config.yaml
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      # Inside a container 127.0.0.1 is the gateway's own loopback, so this
+      # must be the host (host.docker.internal on Docker Desktop) or a service
+      # name on the same compose network.
+      JEV_BACKEND_BASE_URL: ${JEV_BACKEND_BASE_URL:-http://host.docker.internal:8080}
+      JEV_BACKEND_MODEL: ${JEV_BACKEND_MODEL:-}
+      JEV_BACKEND_API_KEY: ${JEV_BACKEND_API_KEY:-}
+      JEV_BACKEND_EXTRA_BODY: ${JEV_BACKEND_EXTRA_BODY:-}
     restart: unless-stopped
     healthcheck:
       test:

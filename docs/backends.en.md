@@ -50,7 +50,7 @@ floored probability is not trustworthy.
     report log10), but softmax is scale-invariant in the sense that a *monotone* transform
     of all logprobs would change the result. In practice servers agree on natural log and
     the distributions are comparable — which is exactly what
-    [`compare_backends.py`](scripts#comparing-two-backends) measures.
+    [Comparing two backends](#comparing-two-backends) measures.
 
 ## `supports_images`
 
@@ -69,8 +69,23 @@ fails with `BACKEND_PROTOCOL_ERROR`. The gateway does not guess the fix; set
 | --------------------------------- | ------------------------------------------------ |
 | llama.cpp / vLLM / SGLang (Qwen3) | `chat_template_kwargs: {enable_thinking: false}` |
 | OpenAI o-series / GPT-5           | `reasoning_effort: none`                         |
-| OpenRouter (any reasoning model)  | `reasoning: {enabled: false}`                    |
+| OpenRouter, `openrouter/qwen/*`   | `reasoning: {effort: "none"}`                    |
 | DeepSeek `deepseek-reasoner`      | *(no off switch — use `deepseek-chat` instead)*  |
+
+!!! danger "OpenRouter's `reasoning.enabled: false` does nothing"
+
+    `reasoning: {enabled: false}` is accepted without error but has **no effect** — the
+    worst kind of failure, because the configuration looks completely correct while
+    thinking carries on regardless. Measured against
+    `openrouter/qwen/qwen3.8-27b`, only `reasoning: {effort: "none"}` actually turns
+    thinking off.
+
+    If you are unsure which spelling your server honours, **send both**: unknown keys are
+    silently ignored, the one it knows takes effect.
+
+    ```bash
+    JEV_BACKEND_EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}, "reasoning": {"effort": "none"}}'
+    ```
 
 In YAML:
 
@@ -87,39 +102,95 @@ backend:
 `extra_body` cannot silently break the decision path. Leave it `{}` for a non-reasoning
 model.
 
-!!! tip "Diagnosing a protocol error"
+## Silent failure: `HTTP 200` with `logprobs: null` {#silent-logprobs-null}
 
-    A `BACKEND_PROTOCOL_ERROR` on every question is almost always one of three things:
-    thinking not disabled on a reasoning model, a server that does not return
-    `logprobs.content[0].top_logprobs`, or a model that never emits a bare letter because
-    its chat template wraps answers. Check the raw response from
-    `POST /v1/chat/completions` with `curl` before changing any gateway setting.
+**This is the failure that stalls people the longest when swapping backends.** The request
+returns `200`, the gateway reports
+`BACKEND_PROTOCOL_ERROR: backend response contained no logprobs object`, and the backend
+log contains no error at all. In almost every case it is one of the two causes below, and
+**neither of them raises an error**.
+
+### 1. Thinking was not disabled, so the single token was spent on it
+
+`max_tokens: 1` allows the model to emit a single token. With thinking left on, that one
+token is a thinking fragment and the response looks like this:
+
+```json
+{"message": {"content": "", "reasoning": "We",
+             "reasoning_details": [{"type": "reasoning.text", "text": "We"}]},
+ "finish_reason": "length", "logprobs": null}
+```
+
+The test is trivial: **a `reasoning` or `reasoning_details` field in the response means
+thinking is still on.** Fix `extra_body` per
+[Reasoning models](#reasoning-models).
+
+### 2. `top_logprobs` exceeded the server's limit
+
+The OpenAI spec caps `top_logprobs` at **20**, while the gateway's default is **128**. Past
+the cap the backend does **not** return 400 — it simply turns `logprobs` into `null`, which
+is the same symptom as the case above.
+
+Measured on `openrouter/qwen/qwen3.8-27b` at `192.168.1.200:8080`:
+
+| `top_logprobs` | 5  | 20 | 24 | 32 | 64 | 128 |
+| -------------- | -- | -- | -- | -- | -- | --- |
+| `logprobs`      | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+The cap **varies by backend** and must not be assumed. `openrouter/qwen/qwen3.7-flash` on the
+same server caps out at **5**.
+
+!!! warning "A healthy probe is not a healthy gateway"
+
+    Hand-written `curl` probes tend to use `top_logprobs: 20`, which works perfectly; the
+    gateway uses the default 128 and therefore fails on every request. Both produce the
+    same symptom, so it is easy to conclude "the backend is fine". **Test with the
+    gateway's default window** when moving to a new backend.
+
+### Diagnostic order
+
+```bash
+curl -s http://<backend>/v1/chat/completions \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer $KEY" \
+  -d '{"model":"<model id>","messages":[{"role":"user","content":"Reply with the single letter A."}],
+       "max_tokens":1,"temperature":0,"logprobs":true,"top_logprobs":128,
+       "reasoning":{"effort":"none"}}'
+```
+
+Check three things:
+
+1. Is there a `reasoning` field in the response? Then thinking is not off.
+2. Is `logprobs` `null` and `content` an empty array? Keep going.
+3. Try `top_logprobs` at 20, 24, 32, 64, 128 — find the largest value that works and put
+   it in `JEV_BACKEND_TOP_LOGPROBS`.
+
+!!! tip "Other protocol errors"
+
+    A `BACKEND_PROTOCOL_ERROR` on every question can also mean the server never returns
+    `logprobs.content[0].top_logprobs`, or that the model's chat template never emits a
+    bare letter. Check the raw response from `POST /v1/chat/completions` with `curl`
+    before changing any gateway setting.
 
 ## Comparing two backends
 
 Different servers, different quantisations and different `top_logprobs` values produce
-different probability vectors even when the argmax agrees. The script that measures this:
+different probability vectors even when the argmax agrees. To measure this, point the same
+gateway at each `JEV_BACKEND_BASE_URL` / `JEV_BACKEND_TOP_LOGPROBS` pair, run one round
+each, and keep the `answers.<q>.logprobs` vectors:
 
 ```bash
-python scripts/compare_backends.py \
-    --backend llama=http://127.0.0.1:8080+top_logprobs:128 \
-    --backend vllm=http://127.0.0.1:8001+top_logprobs:64 \
-    --repeat 3
+# backend A
+curl -s http://127.0.0.1:8000/v1/systemone -H 'content-type: application/json' -d @case.json
+
+# backend B: change JEV_BACKEND_BASE_URL / JEV_BACKEND_TOP_LOGPROBS, restart, run again
+curl -s http://127.0.0.1:8000/v1/systemone -H 'content-type: application/json' -d @case.json
 ```
 
-```
-=== pairwise agreement ===
-llama vs vllm: argmax 4/5, mean|dp| 0.0413, brier distance 0.00298
-
-=== latency ===
-llama                  n=15  p50=  62.4ms p95=  88.1ms mean=  67.0ms
-vllm                   n=15  p50=  41.9ms p95=  55.3ms mean=  44.8ms
-```
+Then look at three things per question:
 
 * **argmax agreement** — did the *ranking* survive?
 * **mean|dp|** — how far the probability vectors moved.
 * **Brier distance** — the mean squared gap between them. This is the number to watch:
   high argmax agreement with a large Brier distance means a quantisation or backend change
   quietly broke your thresholds.
-
-See [Scripts](scripts#comparing-two-backends) for the full script list.

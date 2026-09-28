@@ -4,9 +4,11 @@
 #   # copy your .gguf (and the mmproj for vision models) into ./models
 #   docker compose -f docker-compose.llamacpp.yml up -d
 #
-# config.yaml is mounted over /app/config.yaml.  Edit it so backend.base_url is
-# the service name below -- inside a container 127.0.0.1 is the gateway's own
-# loopback, not llama-server's.  backend.type stays "openai".
+# JEV_BACKEND_BASE_URL below points at the service name, not at loopback:
+# inside a container 127.0.0.1 is the gateway's own loopback, not
+# llama-server's.  Every setting is an environment variable, so there is no
+# config file to copy and nothing to mount -- override JEV_BACKEND_MODEL in a
+# .env file next to this one if llama-server needs a served model name.
 
 name: jev-gateway-llamacpp
 
@@ -19,9 +21,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      JEV_GATEWAY_CONFIG: /app/config.yaml
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      JEV_BACKEND_BASE_URL: http://llama-server:8080
+      JEV_BACKEND_MODEL: ${JEV_BACKEND_MODEL:-}
+      JEV_BACKEND_EXTRA_BODY: ${JEV_BACKEND_EXTRA_BODY:-}
     restart: unless-stopped
     depends_on:
       llama-server:

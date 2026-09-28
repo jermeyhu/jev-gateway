@@ -90,12 +90,16 @@ high share of the *relative* distribution.
 ## Why not just call a tool
 
 Asking the model to emit a tool call and reading the arguments is the obvious alternative,
-and it works. It also has to *generate* the call: ~18 decode steps per decision, ~55
-output tokens. The gateway decodes exactly one token.
+and it works. It also has to *generate* the call: a whole tool-call JSON per question,
+measured at 42–48 output tokens. The gateway decodes exactly one token.
 
-On the same evidence and rubric the two paths produced identical accuracy, but the gateway
-was ~11× faster with a warm prompt cache. Choose the direct path only when the model must
-reason in free text before deciding. See [Limits & FAQ](limits#why-is-the-direct-tool-calling-path-slower).
+Across 10 business cases **the gateway is faster and more accurate on both backends**: 1.95×
+at 27B, 8.9× at 0.8B. The ~1 second at 27B is a fixed cost of going out through the proxy
+that both paths pay, so it cancels in the difference — but it makes the absolute number
+unreadable and dilutes the ratio. The 0.8B has no such floor, so 8.9× is the honest reading of
+the protocol's efficiency. Choose the direct path only when the model must reason in free
+text before deciding. See
+[Limits & FAQ](limits#why-is-the-direct-tool-calling-path-slower).
 
 ## The system prompt
 

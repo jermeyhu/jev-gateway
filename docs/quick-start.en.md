@@ -6,38 +6,45 @@
 pip install -e ".[dev]"           # or: pip install -e .
 ```
 
-Python 3.11 or newer is required. The runtime dependencies are `fastapi`, `httpx`,
-`pydantic`, `pyyaml` and `uvicorn[standard]`.
+Python 3.11 or newer is required. The runtime dependencies are `fastapi`, `httpx`, `pydantic`
+and `uvicorn[standard]`.
 
 ## Configure
 
+Configuration is entirely `JEV_`-prefixed environment variables — **there is no config
+file**. Anything you do not set falls back to its default, so the gateway starts in an
+empty environment. To keep them together, use the template:
+
 ```bash
-cp config.yaml config.local.yaml  # optional, keeps the shipped file pristine
-$EDITOR config.local.yaml
+cp .env.example .env      # .env is git-ignored
+$EDITOR .env
 ```
 
-`JEV_GATEWAY_CONFIG` is the only environment variable the gateway reads; it defaults to
-`./config.yaml`. The server then listens on `server.host:server.port` (default
-`0.0.0.0:8000`).
-
-The one line that matters is `backend.base_url` — the address of your OpenAI-compatible
+The one line that matters is `JEV_BACKEND_BASE_URL` — the address of your OpenAI-compatible
 server:
 
-```yaml
-backend:
-  type: openai
-  base_url: http://127.0.0.1:8080
-  model: null          # null = auto-detect from the server's /v1/models
+```bash
+JEV_BACKEND_BASE_URL=http://127.0.0.1:8080
+JEV_BACKEND_MODEL=                      # empty = auto-detect from /v1/models
 ```
+
+Every variable, default and valid range is in the
+[configuration reference](configuration.en.md). The server listens on
+`JEV_SERVER_HOST:JEV_SERVER_PORT` (default `0.0.0.0:8000`).
 
 ## Run
 
 ```bash
-JEV_GATEWAY_CONFIG=config.local.yaml python -m app
+set -a; . ./.env; set +a     # export .env into this shell
+python -m app
 ```
 
-The console script `jev-gateway` is equivalent and needs no config path on the command
-line if the environment variable is set.
+The console script `jev-gateway` is equivalent once the variables are exported. You can also
+pass them straight on the command line and skip the file entirely:
+
+```bash
+JEV_BACKEND_BASE_URL=http://192.168.1.10:8080 python -m app
+```
 
 Check that it is alive:
 
@@ -98,8 +105,9 @@ docker compose up -d                                   # gateway alone
 docker compose -f docker-compose.llamacpp.yml up -d    # gateway + llama-server
 ```
 
-Each template mounts the same `./config.yaml`; edit the `command` block to change the
-model, context length or port. Put a `.gguf` in `./models` before starting a backend
+Each template passes configuration through `environment:` and **mounts no file at all**. To
+change the backend address, change that variable; to change the model, context length or
+port, edit the `command` block. Put a `.gguf` in `./models` before starting a backend
 stack. Vision models also need the projector: add
 `--mmproj /models/mmproj.gguf` to the `llama-server` command and check
 `GET /props` → `modalities.vision` is `true`.
@@ -107,12 +115,31 @@ stack. Vision models also need the projector: add
 ## Verify end to end
 
 ```bash
-python scripts/smoke_test.py --url http://127.0.0.1:8000
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
+curl -s http://127.0.0.1:8000/healthz
+curl -s http://127.0.0.1:8000/readyz
+
+curl -s http://127.0.0.1:8000/v1/systemone \
+  -H 'content-type: application/json' \
+  -d '{
+        "state": {"error_rate": 0.31, "p99_latency_ms": 4100},
+        "questions": {
+          "severity": {
+            "type": "choice",
+            "instructions": "Pick the severity.",
+            "criteria": {
+              "sev1": "error_rate >= 0.20",
+              "sev2": "error_rate >= 0.05 but < 0.20",
+              "sev3": "error_rate < 0.05"
+            }
+          }
+        }
+      }'
 ```
 
-The smoke test hits `/healthz`, `/readyz` and `/v1/systemone`, validates that every answer
-has the right shape, and prints the usage and diagnostics blocks.
+`/healthz` proves the process is up, `/readyz` proves the backend is ready and reports the
+model it loaded, and the last call returns the answers plus the `usage` and `diagnostics`
+blocks. To include an image, replace `state` with
+`{"images": ["data:image/png;base64,..."]}`.
 
 !!! note "vLLM and SGLang"
 

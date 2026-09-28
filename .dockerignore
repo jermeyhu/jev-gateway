@@ -7,9 +7,17 @@ __pycache__
 .ruff_cache
 .mypy_cache
 tests
-scripts
 models
 *.gguf
+
+# Never bake a developer's local endpoints or API keys into the image.  There is
+# no config file any more -- every setting is an environment variable passed at
+# run time -- but a stray .env in the build context would still be copied in by
+# a careless `COPY . .`.
+.env
+.env.*
+!.env.example
+
 README*.md
 docker-compose.yml
 docs

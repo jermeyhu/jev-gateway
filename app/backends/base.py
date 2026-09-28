@@ -170,10 +170,10 @@ class DecisionBackend(abc.ABC):
     async def _discover_model(self) -> None:
         """Best-effort read of the backend's own model name.
 
-        ``config.yaml`` documents ``model: null`` as "use the backend's own",
-        so the name is picked up from ``/v1/models`` instead of being reported
-        as ``unknown``.  A server that does not implement the endpoint is not an
-        error: the name simply stays empty.
+        ``JEV_BACKEND_MODEL`` documents an empty value as "use the backend's
+        own", so the name is picked up from ``/v1/models`` instead of being
+        reported as ``unknown``.  A server that does not implement the endpoint
+        is not an error: the name simply stays empty.
         """
         if self.settings.model:
             return

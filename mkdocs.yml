@@ -55,9 +55,6 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/jermeyhu/jev-gateway
       name: Source code on GitHub
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/jev-gateway/
-      name: Package on PyPI
     - icon: fontawesome/solid/globe
       link: https://github.com/David-Lolly/Jev-Compatible
       name: Reference implementation
@@ -87,7 +84,6 @@ plugins:
             配置参考: Configuration
             后端: Backends
             图片: Images
-            脚本: Scripts
             限制与 FAQ: Limits & FAQ
             开发: Development
 
@@ -99,7 +95,6 @@ nav:
   - 配置参考: configuration.md
   - 后端: backends.md
   - 图片: images.md
-  - 脚本: scripts.md
   - 限制与 FAQ: limits.md
   - 开发: development.md
 
