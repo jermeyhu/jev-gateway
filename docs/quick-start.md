@@ -1,52 +1,49 @@
-# Quick start
+# 快速开始 {#quick-start}
 
-## Install
+## 安装 {#install}
 
 ```bash
-pip install -e ".[dev]"           # or: pip install -e .
+pip install -e ".[dev]"           # 或 pip install -e .
 ```
 
-Python 3.11 or newer is required. The runtime dependencies are `fastapi`, `httpx`,
-`pydantic`, `pyyaml` and `uvicorn[standard]`.
+需要 Python 3.11 或更新版本。运行时依赖为 `fastapi`、`httpx`、`pydantic`、`pyyaml` 和
+`uvicorn[standard]`。
 
-## Configure
+## 配置 {#configure}
 
 ```bash
-cp config.yaml config.local.yaml  # optional, keeps the shipped file pristine
+cp config.yaml config.local.yaml  # 可选，保留仓库里的原文件不动
 $EDITOR config.local.yaml
 ```
 
-`JEV_GATEWAY_CONFIG` is the only environment variable the gateway reads; it defaults to
-`./config.yaml`. The server then listens on `server.host:server.port` (default
-`0.0.0.0:8000`).
+`JEV_GATEWAY_CONFIG` 是网关唯一读取的环境变量，默认 `./config.yaml`。监听地址取
+`server.host:server.port`（默认 `0.0.0.0:8000`）。
 
-The one line that matters is `backend.base_url` — the address of your OpenAI-compatible
-server:
+真正要改的是 `backend.base_url`——你的 OpenAI 兼容服务的地址：
 
 ```yaml
 backend:
   type: openai
   base_url: http://127.0.0.1:8080
-  model: null          # null = auto-detect from the server's /v1/models
+  model: null          # null = 从服务的 /v1/models 自动探测
 ```
 
-## Run
+## 运行 {#run}
 
 ```bash
 JEV_GATEWAY_CONFIG=config.local.yaml python -m app
 ```
 
-The console script `jev-gateway` is equivalent and needs no config path on the command
-line if the environment variable is set.
+如果已经设置了环境变量，等价的控制台脚本是 `jev-gateway`，不需要在命令行再传配置路径。
 
-Check that it is alive:
+确认它活着：
 
 ```bash
 curl http://127.0.0.1:8000/healthz
 # {"status":"ok","version":"0.1.0"}
 ```
 
-## Send a decision
+## 发一次决策 {#send-a-decision}
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/systemone \
@@ -89,39 +86,36 @@ curl -X POST http://127.0.0.1:8000/v1/systemone \
 }
 ```
 
-One request, three decisions, three output tokens.
+一次请求，三个决策，三个输出 token。
 
-## Docker
+## Docker {#docker}
 
 ```bash
-docker compose up -d                                   # gateway alone
-docker compose -f docker-compose.llamacpp.yml up -d    # gateway + llama-server
+docker compose up -d                                   # 仅网关
+docker compose -f docker-compose.llamacpp.yml up -d    # 网关 + llama-server
 ```
 
-Each template mounts the same `./config.yaml`; edit the `command` block to change the
-model, context length or port. Put a `.gguf` in `./models` before starting a backend
-stack. Vision models also need the projector: add
-`--mmproj /models/mmproj.gguf` to the `llama-server` command and check
-`GET /props` → `modalities.vision` is `true`.
+每个模板都挂载同一个 `./config.yaml`；改模型、上下文长度或端口，直接编辑 `command` 段。
+启动后端栈前先把 `.gguf` 放进 `./models`。视觉模型还需要投影权重：在 `llama-server` 命令
+里加 `--mmproj /models/mmproj.gguf`，并用 `GET /props` 确认 `modalities.vision` 为 `true`。
 
-## Verify end to end
+## 端到端验证 {#verify-end-to-end}
 
 ```bash
 python scripts/smoke_test.py --url http://127.0.0.1:8000
 python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
 ```
 
-The smoke test hits `/healthz`, `/readyz` and `/v1/systemone`, validates that every answer
-has the right shape, and prints the usage and diagnostics blocks.
+冒烟脚本会访问 `/healthz`、`/readyz` 和 `/v1/systemone`，校验每个答案的结构是否正确，并
+打印 usage 与 diagnostics。
 
-!!! note "vLLM and SGLang"
+!!! note "vLLM 与 SGLang"
 
-    Only the llama.cpp compose stack ships with this repository. To reach a vLLM or
-    SGLang server, point `backend.base_url` at it and set `backend.model` to the name
-    the server was started with. See [Backends](backends.md).
+    仓库里只随附 llama.cpp 那套 compose。要对接 vLLM 或 SGLang，把 `backend.base_url`
+    指过去，并把 `backend.model` 设成服务启动时用的名字。见[后端](backends.md)。
 
-## Where to go next
+## 接下来 {#where-to-go-next}
 
-* [How it works](how-it-works.md) — the classification trick and the prompt layouts.
-* [API reference](api.md) — every field, endpoint and error code.
-* [Backends](backends.md) — the `base_url` table for llama.cpp, vLLM and SGLang.
+* [工作方式](how-it-works.md)——分类技巧与 prompt 布局。
+* [接口参考](api.md)——所有字段、端点与错误码。
+* [后端](backends.md)——llama.cpp / vLLM / SGLang 的 `base_url` 对照表。

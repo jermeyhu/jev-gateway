@@ -1,7 +1,6 @@
-# Configuration
+# 配置参考 {#configuration}
 
-The gateway reads one YAML file. By default that is `./config.yaml`; override the path
-with the `JEV_GATEWAY_CONFIG` environment variable.
+网关只读一个 YAML 文件，默认是 `./config.yaml`；用 `JEV_GATEWAY_CONFIG` 环境变量可以改路径。
 
 ```yaml
 server:
@@ -36,99 +35,86 @@ logging:
   level: INFO
 ```
 
-**Unknown keys are a hard error**, so a typo fails at startup instead of being ignored.
+**未知键直接报错**，拼写错误在启动时失败而不是被忽略。
 
-## Reference
+## 完整对照 {#reference}
 
-| section      | key                                          | default                 | notes                                                            |
-| ------------ | -------------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `server`     | `host` / `port`                              | `0.0.0.0` / `8000`      |                                                                  |
-| `backend`    | `type`                                       | `openai`                | the only supported protocol                                      |
-| `backend`    | `base_url` / `model` / `api_key`             | — / `null` / `null`     | `model: null` reports the backend's own model name                |
-| `backend`    | `timeout_seconds`                            | `30.0`                  | per question                                                     |
-| `backend`    | `max_concurrency`                            | `32`                    | per gateway instance                                             |
-| `backend`    | `top_logprobs`                               | `128`                   | 16 – 4096; candidates outside the window are floored             |
-| `backend`    | `supports_images`                            | `null` (auto)           | `true` / `false` to force                                        |
-| `backend`    | `extra_headers` / `extra_body`               | `{}`                    | cloud API keys, tenant ids; see *Reasoning models*                |
-| `request`    | `max_questions`                              | `64`                    | 1 – 64 questions per request                                      |
-| `request`    | `total_timeout_seconds`                      | `60.0`                  | whole-request budget                                              |
-| `request`    | `prompt_layout`                              | `fused`                 | `fused` \| `split`                                                |
-| `multimodal` | `enabled` / `max_images` / `max_image_bytes` | `true` / `4` / `5242880` | `allow_remote_urls: false`                                       |
-| `logging`    | `level`                                      | `INFO`                  |                                                                  |
+| 段           | 键                                          | 默认值                    | 说明                                    |
+| ------------ | ------------------------------------------- | ------------------------- | --------------------------------------- |
+| `server`     | `host` / `port`                             | `0.0.0.0` / `8000`        |                                         |
+| `backend`    | `type`                                      | `openai`                  | 唯一支持的协议                          |
+| `backend`    | `base_url` / `model` / `api_key`            | — / `null` / `null`       | `model: null` 时用后端自报模型名        |
+| `backend`    | `timeout_seconds`                           | `30.0`                    | 单问题超时                              |
+| `backend`    | `max_concurrency`                           | `32`                      | 单网关实例并发上限                      |
+| `backend`    | `top_logprobs`                              | `128`                     | 16 – 4096；窗口外候选按下界截断         |
+| `backend`    | `supports_images`                           | `null`（自动）            | `true` / `false` 强制指定              |
+| `backend`    | `extra_headers` / `extra_body`              | `{}`                      | 云 API key、租户标识；见「推理模型」    |
+| `request`    | `max_questions`                             | `64`                      | 单次请求 1 – 64 个问题                  |
+| `request`    | `total_timeout_seconds`                     | `60.0`                    | 整次请求预算                            |
+| `request`    | `prompt_layout`                             | `fused`                   | `fused` \| `split`                     |
+| `multimodal` | `enabled` / `max_images` / `max_image_bytes` | `true` / `4` / `5242880`  | `allow_remote_urls: false`              |
+| `logging`    | `level`                                     | `INFO`                    |                                         |
 
-A trailing slash on `base_url` is trimmed, so `http://127.0.0.1:8080/` and
-`http://127.0.0.1:8080` are equivalent.
+`base_url` 末尾的斜杠会被去掉，所以 `http://127.0.0.1:8080/` 和 `http://127.0.0.1:8080`
+等价。
 
-## Sections
+## 各段说明 {#sections}
 
 ### `server`
 
-The bind address. `0.0.0.0:8000` by default, which is what the container image and the
-Docker Compose templates use.
+监听地址。默认 `0.0.0.0:8000`，容器镜像和 Docker Compose 模板用的就是这个。
 
 ### `backend`
 
-`type` is always `openai` — the gateway speaks exactly one protocol. What changes between
-servers is only `base_url`; see [Backends](backends.md#base_url-by-server).
+`type` 恒为 `openai`——网关只说一种协议。不同服务之间只有 `base_url` 会变，见
+[后端](backends.md#base_url-by-server)。
 
-`model: null` means auto-detect: the gateway asks the server's `/v1/models` and uses the
-first model it reports. Servers that name several models, or that require the client to
-state which one it wants (vLLM, SGLang with multiple served models), should be pinned
-explicitly.
+`model: null` 表示自动探测：网关会问服务的 `/v1/models` 并取它报告的第一个模型。会报出
+多个模型的服务，或要求客户端指明用哪个的服务（vLLM、开了多个 served model 的 SGLang），
+应显式固定。
 
-`top_logprobs` is the size of the next-token window. The default `128` is generous for two
-to four candidates; raise it if you see `truncated: true` in the diagnostics, lower it if
-the server refuses large windows. The accepted range is 16 – 4096.
+`top_logprobs` 是 next-token 窗口的大小。两到四个候选时默认的 `128` 已经相当宽裕；看到
+诊断里的 `truncated: true` 就上调，服务端拒绝大窗口时才下调。取值范围 16 – 4096。
 
-`supports_images: null` is "auto": assume the backend accepts images and simply do not
-send any when they are absent. Set it to `false` when the model has no vision tower, so
-image requests fail fast with `BACKEND_CAPABILITY_UNSUPPORTED` instead of reaching the
-backend.
+`supports_images: null` 即「自动」：假定后端能接收图片，图片缺失时就不投递。模型没有
+视觉塔时显式设为 `false`，图片请求会以 `BACKEND_CAPABILITY_UNSUPPORTED` 快速失败，而
+不会打到后端。
 
-`extra_headers` is merged into every request as HTTP headers — a cloud API key, a tenant
-id, a project name. `extra_body` is merged into the JSON body; it is where a server's
-"turn thinking off" switch belongs. Neither can override `messages`, `max_tokens`,
-`logprobs` or `top_logprobs`.
+`extra_headers` 会作为 HTTP 头合并进每个请求——云 API key、租户 id、项目名。`extra_body`
+会合并进 JSON body；服务端「关思考」的开关就写在这里。两者都无法覆盖 `messages`、
+`max_tokens`、`logprobs` 和 `top_logprobs`。
 
 ### `request`
 
-`max_questions` caps how many questions one request may carry (1 – 64). Requests above the
-cap are rejected with `INVALID_REQUEST`.
+`max_questions` 限制单次请求能带多少问题（1 – 64）。超出的请求以 `INVALID_REQUEST` 拒绝。
 
-`total_timeout_seconds` is the budget for the entire request, all questions together. The
-questions run concurrently, so a request with 64 questions and a 60-second budget still
-finishes in roughly the time of the slowest single question — unless the backend is
-saturated.
+`total_timeout_seconds` 是整次请求的总预算，所有问题加起来。由于问题并发执行，一个 64
+问题、60 秒预算的请求，耗时大致仍等于最慢的那一个问题——除非后端已经饱和。
 
-`prompt_layout` is `fused` (default, byte-compatible with the reference gateway) or
-`split` (cache-friendly). Both are described in
-[How it works](how-it-works.md#prompt-layouts).
+`prompt_layout` 可选 `fused`（默认，与参考网关逐字节兼容）或 `split`（对缓存友好）。
+两者都在[工作方式](how-it-works.md#prompt-layouts)里有说明。
 
 ### `multimodal`
 
-| key                     | default            | meaning                                        |
-| ----------------------- | ------------------ | ---------------------------------------------- |
-| `enabled`               | `true`             | when `false`, any `images` field is a 400      |
-| `max_images`            | `4`                | images per request                              |
-| `max_image_bytes`       | `5242880` (5 MiB)  | per image, after base64 decoding                |
-| `allow_remote_urls`     | `false`            | opt in to `https://` image references           |
-| `allowed_mime_prefixes` | `["image/"]`       | accepted media types                            |
+| 键                       | 默认值               | 含义                                |
+| ------------------------ | -------------------- | ----------------------------------- |
+| `enabled`                | `true`               | 为 `false` 时任何 `images` 都报 400 |
+| `max_images`             | `4`                  | 单次请求的图片数                    |
+| `max_image_bytes`        | `5242880`（5 MiB）   | 单图，base64 解码后计算            |
+| `allow_remote_urls`      | `false`               | 开启后才接受 `https://` 图片引用   |
+| `allowed_mime_prefixes`  | `["image/"]`          | 接受的媒体类型                      |
 
-`allow_remote_urls: false` is the default because a remote URL makes the gateway fetch
-whatever the caller points at — a server-side request forgery surface. Turn it on only
-when you control both ends.
+`allow_remote_urls` 默认为 `false`，因为远程 URL 会让网关去取调用方指定的任意地址——这是
+一个服务端请求伪造面。只有两端都归你所有时才应该打开。
 
 ### `logging`
 
-`level` accepts the standard Python levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`. `INFO` is
-the default. Every response already carries an `x-request-id`; the log lines use the same
-id, so grep for it when correlating a report with the logs.
+`level` 接受标准 Python 日志级别：`DEBUG`、`INFO`、`WARNING`、`ERROR`。默认 `INFO`。
+每个响应本来就带 `x-request-id`，日志用的也是同一个 id，排查时直接 grep 它即可。
 
-## Prompt layouts in one line
+## Prompt 布局一句话版 {#prompt-layouts-in-one-line}
 
-* `fused` — one user message with `{evidence, criterion, options}`; byte compatible with
-  the reference gateway, so calibration measured against the hosted API transfers.
-* `split` — evidence (and images) in the first user message, criterion and options in a
-  second. The first message is identical for every question, so llama.cpp reuses the vision
-  encoder work and the state prefill. Use it when latency matters more than
-  byte-compatibility.
+* `fused`——单条 user message 含 `{evidence, criterion, options}`，与参考网关逐字节兼容，
+  在托管 API 上测出的校准结论可以直接迁移。
+* `split`——证据（及图片）放第一条 user message，指令与选项放第二条。第一条在同一次请求
+  的所有问题之间完全相同，llama.cpp 可复用视觉编码和状态 prefill。延迟优先于字节兼容时用。

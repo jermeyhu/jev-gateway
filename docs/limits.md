@@ -1,123 +1,107 @@
-# Limits & FAQ
+# 限制与 FAQ {#limits-faq}
 
-## Known limits
+## 已知限制 {#known-limits}
 
-* The `noul` probability is a softmax over the two candidate letters only; calibrate
-  thresholds against your own labelled set.
-* A question carries at most **16 candidates**; more is rejected with `INVALID_REQUEST`.
-* `truncated: true` in diagnostics means a candidate was floored; raise `top_logprobs`.
-* Images extend the reference contract; clients written against the hosted service still
-  work but ignore the field.
-* Scale horizontally behind a load balancer rather than raising `max_concurrency` beyond
-  the backend's real capacity.
+* `noul` 概率是只对两个候选字母做 softmax；阈值要在自己的标注集上校准。
+* 单个问题最多 **16 个候选**，超出以 `INVALID_REQUEST` 拒绝。
+* 诊断里出现 `truncated: true` 说明有候选被截断；上调 `top_logprobs`。
+* 图片是对参考契约的扩展，按托管服务写的客户端仍可运行，但会忽略该字段。
+* 超出后端真实能力的部分应靠水平扩展解决，而不是继续调高 `max_concurrency`。
 
-## Calibration
+## 校准 {#calibration}
 
-Decision models are **calibration sensitive**. Threshold gating — `if p < 0.7: ask a
-human` — only works if the probabilities are honest, and aggressive quantisation can
-preserve the argmax while destroying the confidence.
+决策模型对**校准**敏感。阈值门禁（`p < 0.7 转人工`）成立的前提是概率诚实，而激进量化
+可能保住 argmax 却毁掉置信度。
 
-Prefer **Q8_0 or F16** for gate models. Treat Q4_K_M as an experiment, and measure it with
-[`compare_backends.py`](scripts.md#comparing-two-backends) rather than assuming.
+用于门禁的模型优先 **Q8_0 或 F16**；Q4_K_M 按实验对待，并用
+[`compare_backends.py`](scripts.md#comparing-two-backends) 测量，而不是靠假设。
 
-Two habits keep a threshold trustworthy:
+两个习惯能让阈值保持可信：
 
-1. Re-run `compare_backends.py` after every model swap, quantisation change or server
-   change, and watch the Brier distance rather than the argmax agreement.
-2. Keep a small labelled set from your own traffic and check the score the gateway assigns
-   against it. The hosted API's calibration does not transfer to a 4B model on your
-   hardware without re-measurement.
+1. 每次换模型、换量化、换服务之后都重跑一次 `compare_backends.py`，盯 Brier 距离而不是
+   argmax 一致性。
+2. 留一份来自你自己流量的小标注集，核对网关给出的分数。托管 API 的校准结论不会自动
+   迁移到你硬件上的 4B 模型，必须重新测量。
 
-## FAQ
+## FAQ {#faq}
 
-### Why is the direct tool-calling path slower?
+### 为什么直连工具调用路径更慢？ {#why-is-the-direct-tool-calling-path-slower}
 
-Both paths were measured on the same evidence and rubric (Qwen3.5-0.8B on llama.cpp,
-single-threaded, 6 SRE triage cases × 3 runs, thinking disabled on both paths):
+两条路径在同一证据、同一评分标准下的实测（Qwen3.5-0.8B + llama.cpp，单线程，6 个 SRE
+分诊案例 × 3 轮，两条路径都关思考）：
 
-| metric (per case = 3 decisions) | gateway (logprobs) | direct tool call |
-| ------------------------------- | ------------------ | ---------------- |
-| latency, warm prompt cache      | **421 ms**         | 4547 ms          |
-| latency, cold cache (first run) | 4742 ms            | 4258 ms          |
-| output tokens                   | **3** (fixed)      | ~55              |
-| input tokens (18 cases, total)  | 10 881             | 11 661           |
-| accuracy, precise rubric        | 3/4                | 3/4              |
+| 指标（每案例 = 3 个决策）       | 网关（logprobs） | 直连工具调用 |
+| ------------------------------- | ---------------- | ------------ |
+| 延迟，prompt 缓存命中后         | **421 ms**       | 4547 ms      |
+| 延迟，冷缓存（首轮）            | 4742 ms          | 4258 ms      |
+| 输出 token                      | **3**（固定）    | ~55          |
+| 输入 token（18 案例合计）       | 10 881           | 11 661       |
+| 正确率（精确评分标准）          | 3/4              | 3/4          |
 
-Generating a tool-call JSON costs ~18 decode steps per decision; the gateway decodes
-exactly one token. The cold-cache row is the honest counterpoint: the first request pays
-the prefill either way, so the win shows up on every request after it. Use the direct path
-only when the model must reason in free text before deciding.
+生成一次工具调用 JSON 每个决策要解码约 18 个 token；网关只解码 1 个。冷缓存那一行是
+诚实的补充：首次请求的 prefill 两边都要付，所以优势出现在之后的每一次请求上。只有当模型
+需要先自由推理再决策时才用直连路径。
 
-### Every question fails with `BACKEND_PROTOCOL_ERROR`. Why?
+### 每个问题都报 `BACKEND_PROTOCOL_ERROR`，为什么？ {#every-question-fails-with-backend_protocol_error-why}
 
-Almost always a reasoning model emitting its thinking as the first token, so no candidate
-letter lands in the top-N window. Set `backend.extra_body` to your server's off switch —
-see [Reasoning models](backends.md#reasoning-models). The other two causes are a server
-that does not return `logprobs.content[0].top_logprobs`, and a chat template that never
-produces a bare letter. Check the raw response with `curl` before changing any setting.
+几乎总是推理模型把思考内容当成第一个 token 输出，于是没有任何候选字母落进 top-N 窗口。
+把 `backend.extra_body` 设成你的服务的关闭开关——见[推理模型](backends.md#reasoning-models)。
+另外两个原因是服务不返回 `logprobs.content[0].top_logprobs`，以及 chat template 永远
+不产生裸字母。改任何设置之前先用 `curl` 看原始响应。
 
-### Can I send 17 options?
+### 能给 17 个选项吗？ {#can-i-send-17-options}
 
-No. 2 – 16 candidates per question; 17 is rejected with `INVALID_REQUEST`. Letters run
-`A`…`P`.
+不能。单题 2 – 16 个候选，17 个会以 `INVALID_REQUEST` 拒绝。字母从 `A` 排到 `P`。
 
-### Do I get partial answers if one question fails?
+### 一个问题失败会拿到部分结果吗？ {#do-i-get-partial-answers-if-one-question-fails}
 
-No. Any failing question fails the whole request, and the first error in question order is
-the one reported. This matches the reference implementation — a decision set is only
-meaningful as a whole.
+不会。任一问题失败则整次请求失败，报出的是按问题顺序的第一个错误。这与参考实现一致——
+一组决策只有作为整体才有意义。
 
-### `truncated: true` — what now?
+### `truncated: true` 怎么办？ {#truncated-true-what-now}
 
-A candidate letter fell outside the `top_logprobs` window and was floored at the least
-likely logprob actually returned. That is a lower bound, not an estimate. Raise
-`backend.top_logprobs` (16 – 4096) and re-measure; if the server refuses a large window,
-reduce the candidate count instead.
+说明某个候选字母落在 `top_logprobs` 窗口之外，被截断到实际返回的最低 logprob。那是下界，
+不是估计值。上调 `backend.top_logprobs`（16 – 4096）并重新测量；如果服务端拒绝大窗口，
+就减少候选数。
 
-### Do the questions really run in parallel?
+### 问题真的是并行的吗？ {#do-the-questions-really-run-in-parallel}
 
-Yes, bounded by `backend.max_concurrency` (default 32). The response preserves the
-request's question order regardless of completion order, and `request.total_timeout_seconds`
-bounds the whole request rather than each question.
+是的，上限为 `backend.max_concurrency`（默认 32）。无论完成顺序如何，响应都保持请求里的
+问题顺序；`request.total_timeout_seconds` 约束整次请求，而不是每个问题。
 
-### How do I know the probabilities are not made up?
+### 我怎么知道这些概率不是编出来的？ {#how-do-i-know-the-probabilities-are-not-made-up}
 
-Run `diagnose_severity.py` and `probe_position_bias.py`. If reordering the candidates
-changes only which *letter* wins and the probability mass tracks the evidence, the
-distribution is reflecting the model's judgement. If the *label* flips with position, the
-model is reading position rather than meaning and the numbers should not be thresholded.
+跑 `diagnose_severity.py` 和 `probe_position_bias.py`。如果打乱候选顺序只改变胜出的*字母*，
+而概率质量跟着证据走，说明分布反映的是模型的判断。如果*标签*随着位置翻转，模型读的是
+位置而不是含义，这些数字就不该拿来设阈值。
 
-### Can I use it with a reasoning model?
+### 能配推理模型用吗？ {#can-i-use-it-with-a-reasoning-model}
 
-Yes, with thinking disabled via `backend.extra_body` — the recipes per server are in
-[Reasoning models](backends.md#reasoning-models). DeepSeek's `deepseek-reasoner` has no
-off switch; use `deepseek-chat`.
+可以，用 `backend.extra_body` 关掉思考即可——各服务端的写法见
+[推理模型](backends.md#reasoning-models)。DeepSeek 的 `deepseek-reasoner` 没有关闭开关，请改用
+`deepseek-chat`。
 
-### Which model size is enough?
+### 多大模型够用？ {#which-model-size-is-enough}
 
-0.6B – 4B is the range where this pattern pays off, because one forward pass is the whole
-cost. A larger model is not automatically a better *classifier* here — the benchmark's
-biggest wins came from rewording the criteria, not from scaling the model.
+0.6B – 4B 是这个模式开始划算的区间，因为全部成本就是一次前向传播。更大的模型在这里不
+自动等于更好的*分类器*——参考基准上最大的收益来自改写判据，而不是放大模型。
 
-### Why does the gateway not stream?
+### 网关为什么不流式？ {#why-does-the-gateway-not-stream}
 
-There is nothing to stream. A decision decodes exactly one token, so a streaming response
-would add complexity and no information. `stream: false` is always sent.
+没有东西可以流式返回。一个决策只解码一个 token，流式只会增加复杂度而不带来信息。
+始终发送 `stream: false`。
 
-### Is the prompt sent to the backend readable?
+### 发给后端的 prompt 可以看吗？ {#is-the-prompt-sent-to-the-backend-readable}
 
-Yes, and that is intentional — the whole design is auditable. `fused` is byte-compatible
-with the reference gateway, and the system prompt is a single constant. Use
-`request.prompt_layout: split` when you want the cacheable prefix instead of the
-byte-compatibility.
+可以，而且这是有意为之——整个设计就是可审计的。`fused` 与参考网关逐字节兼容，system
+prompt 只有一条常量。想要可缓存的前缀而不是字节兼容时，用 `request.prompt_layout: split`。
 
-### How do I scale it?
+### 我该怎么扩容？ {#how-do-i-scale-it}
 
-Run more gateway instances behind a load balancer. Raising `max_concurrency` past the
-backend's real capacity just moves the queue from your process into the inference server,
-where it is harder to observe.
+在负载均衡器后面跑多个网关实例。把 `max_concurrency` 提到后端真实容量之上，只是把队列
+从你的进程挪进推理服务，那里更难观测。
 
-## License
+## 许可 {#license}
 
-Apache-2.0. The request/response contract and the logprob-classification idea are modelled
-on [David-Lolly/Jev-Compatible](https://github.com/David-Lolly/Jev-Compatible).
+Apache-2.0。请求/响应契约与 logprob 分类的思路参考了
+[David-Lolly/Jev-Compatible](https://github.com/David-Lolly/Jev-Compatible)。

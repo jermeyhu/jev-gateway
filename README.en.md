@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
 
 > Full documentation: **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
-> — also in [简体中文](https://jermeyhu.github.io/jev-gateway/zh/)
+> — also in [简体中文](https://jermeyhu.github.io/jev-gateway/)
 
 ## 1. What this is
 
@@ -92,7 +92,7 @@ with `BACKEND_PROTOCOL_ERROR`. Turn thinking off through `backend.extra_body` �
 ## Documentation
 
 The full reference lives at **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
-(简体中文: [/zh/](https://jermeyhu.github.io/jev-gateway/zh/)), built from `docs/` with MkDocs
+(简体中文: [/](https://jermeyhu.github.io/jev-gateway/)), built from `docs/` with MkDocs
 Material: quick start, how it works, API reference, configuration, backends, images, scripts,
 limits & FAQ, and development.
 

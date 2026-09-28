@@ -1,10 +1,10 @@
 # jev-gateway
 
-[![文档](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/zh/)
+[![文档](https://img.shields.io/badge/docs-jermeyhu.github.io%2Fjev--gateway-3f51b5?logo=material%2Ffor-linux)](https://jermeyhu.github.io/jev-gateway/)
 [![许可](https://img.shields.io/badge/license-Apache--2.0-3f51b5)](LICENSE)
 
-> 完整文档：**[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/zh/)**
-> （English: [/](https://jermeyhu.github.io/jev-gateway/)）
+> 完整文档：**[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
+> （English: [/en/](https://jermeyhu.github.io/jev-gateway/en/)）
 
 ## 1. 系统简介
 
@@ -77,11 +77,11 @@ JSON 每个决策要解码约 18 个 token，而网关只解码 1 个。只有�
 
 *推理*模型（Qwen3 / Qwen3.5、DeepSeek-R1、OpenAI o 系列……）会把思考内容作为第一个
 token 输出，于是没有任何字母落进 top-N 窗口，每个问题都以 `BACKEND_PROTOCOL_ERROR`
-失败。关掉思考的方式见[后端页面](https://jermeyhu.github.io/jev-gateway/zh/backends/)。
+失败。关掉思考的方式见[后端页面](https://jermeyhu.github.io/jev-gateway/backends/)。
 
 ## 文档
 
-完整参考在 **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/zh/)**
+完整参考在 **[jermeyhu.github.io/jev-gateway](https://jermeyhu.github.io/jev-gateway/)**
 （English: [/](https://jermeyhu.github.io/jev-gateway/)），由 `docs/` 用 MkDocs Material
 构建：快速开始、工作方式、接口参考、配置参考、后端、图片、脚本、限制与 FAQ、开发。
 

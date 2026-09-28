@@ -1,7 +1,7 @@
 site_name: Jev Gateway
 site_description: >-
-  A self-hosted, Jev / System One compatible decision gateway that runs the
-  decision layer on any OpenAI-compatible server and adds local image input.
+  自托管的 Jev / System One 兼容决策网关：在任何兼容 OpenAI 协议的服务上运行决策层，
+  并扩展出本地图片输入。
 site_author: jermeyhu
 site_url: https://jermeyhu.github.io/jev-gateway/
 repo_url: https://github.com/jermeyhu/jev-gateway
@@ -14,7 +14,7 @@ site_dir: site
 
 theme:
   name: material
-  language: en
+  language: zh
   logo: assets/logo.svg
   favicon: assets/logo.svg
   icon:
@@ -70,9 +70,24 @@ plugins:
   - i18n:
       docs_structure: suffix
       languages:
+        - locale: zh
+          name: 简体中文
+          default: true
+          build: true
+          site_name: Jev Gateway
+          nav_translations:
+            首页: 首页
+            快速开始: 快速开始
+            工作方式: 工作方式
+            接口参考: 接口参考
+            配置参考: 配置参考
+            后端: 后端
+            图片: 图片
+            脚本: 脚本
+            限制与 FAQ: 限制与 FAQ
+            开发: 开发
         - locale: en
           name: English
-          default: true
           build: true
           site_name: Jev Gateway
           nav_translations:
@@ -86,33 +101,18 @@ plugins:
             Scripts: Scripts
             Limits & FAQ: Limits & FAQ
             Development: Development
-        - locale: zh
-          name: 简体中文
-          build: true
-          site_name: Jev Gateway
-          nav_translations:
-            Home: 首页
-            Quick start: 快速开始
-            How it works: 工作方式
-            API reference: 接口参考
-            Configuration: 配置参考
-            Backends: 后端
-            Images: 图片
-            Scripts: 脚本
-            Limits & FAQ: 限制与 FAQ
-            Development: 开发
 
 nav:
-  - Home: index.md
-  - Quick start: quick-start.md
-  - How it works: how-it-works.md
-  - API reference: api.md
-  - Configuration: configuration.md
-  - Backends: backends.md
-  - Images: images.md
-  - Scripts: scripts.md
-  - Limits & FAQ: limits.md
-  - Development: development.md
+  - 首页: index.md
+  - 快速开始: quick-start.md
+  - 工作方式: how-it-works.md
+  - 接口参考: api.md
+  - 配置参考: configuration.md
+  - 后端: backends.md
+  - 图片: images.md
+  - 脚本: scripts.md
+  - 限制与 FAQ: limits.md
+  - 开发: development.md
 
 markdown_extensions:
   - abbr

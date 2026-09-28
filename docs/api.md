@@ -1,10 +1,10 @@
-# API reference
+# 接口参考 {#api-reference}
 
 ## `POST /v1/systemone`
 
-The single decision endpoint.
+唯一的决策端点。
 
-### Request
+### 请求 {#request}
 
 ```json
 {
@@ -29,21 +29,21 @@ The single decision endpoint.
 }
 ```
 
-| field       | type                | required | notes                                                        |
-| ----------- | ------------------- | -------- | ------------------------------------------------------------ |
-| `state`     | string, object, list | yes    | must be non-empty; no `NaN` / `Infinity`                      |
-| `questions` | object              | yes      | 1 – `request.max_questions` (max 64) entries                  |
-| `model`     | string              | no       | advisory only; the backend's own model is reported back       |
-| `images`    | array of strings    | no       | data URLs, opt-in remote URLs, or raw base64                   |
+| 字段        | 类型                   | 必填 | 说明                                                |
+| ----------- | ---------------------- | ---- | --------------------------------------------------- |
+| `state`     | 字符串、对象或数组     | 是   | 不能为空；不允许 `NaN` / `Infinity`                 |
+| `questions` | 对象                   | 是   | 1 – `request.max_questions`（最多 64）个条目        |
+| `model`     | 字符串                 | 否   | 仅作提示；响应中回报后端自己的模型名                |
+| `images`    | 字符串数组             | 否   | data URL、需开启的远程 URL，或裸 base64             |
 
-Every question has a `type` (`noul`, `choice` or `score`) and an `instructions` string.
-`choice` and `score` also require `criteria`; `noul` accepts an optional two-key
-`criteria` that overrides the `Yes` / `No` labels.
+每个问题都有一个 `type`（`noul`、`choice` 或 `score`）和一条 `instructions`。
+`choice` 和 `score` 还要求 `criteria`；`noul` 可以带一个两键的 `criteria`，用来覆盖
+`Yes` / `No` 这两个默认标签。
 
-**Unknown keys anywhere are rejected.** A question carries 2 – **16** candidates; more is
-rejected with `INVALID_REQUEST`.
+**任何位置出现未知字段都会被拒绝。** 单个问题须有 2 – **16** 个候选；更多则以
+`INVALID_REQUEST` 拒绝。
 
-### Response
+### 响应 {#response}
 
 ```json
 {
@@ -74,59 +74,56 @@ rejected with `INVALID_REQUEST`.
 }
 ```
 
-`answers` always has the same keys as the request's `questions`, in the request's order.
+`answers` 的键与请求中 `questions` 的键一致，顺序也一致。
 
-| answer type | shape                                                                          |
-| ----------- | ------------------------------------------------------------------------------ |
-| `noul`      | `{"type": "noul", "noul": p}` — the probability of `criteria.true` (or `Yes`)   |
-| `choice`    | `{"type": "choice", "choice": key, "probabilities": {...}}` — argmax plus the full distribution over candidate keys |
-| `score`     | `{"type": "score", "score": expected, "legend": {...}, "probabilities": {...}}` — the probability-weighted mean of the level indices, so it interpolates between levels instead of collapsing to one |
+| 答案类型  | 结构                                                                          |
+| --------- | ----------------------------------------------------------------------------- |
+| `noul`    | `{"type": "noul", "noul": p}`——`criteria.true`（或 `Yes`）的概率             |
+| `choice`  | `{"type": "choice", "choice": key, "probabilities": {...}}`——argmax 候选加全部候选键上的完整分布 |
+| `score`   | `{"type": "score", "score": expected, "legend": {...}, "probabilities": {...}}`——档位下标的概率加权均值，可在档位之间插值而不是退化成一个点 |
 
-`usage.output_tokens` is the number of questions in practice: one decoded token each.
+`usage.output_tokens` 实际上就是问题数：每题一个解码 token。
 
-`diagnostics.questions.<id>.truncated` is `true` when a candidate letter was outside the
-returned `top_logprobs` window and had to be floored. See
-[Backends](backends.md#reading-the-top-n-window).
+`diagnostics.questions.<id>.truncated` 为 `true` 表示某个候选字母落在返回的 `top_logprobs`
+窗口之外、只能被截断到下界。见[后端](backends.md#reading-the-top-n-window)。
 
-### Semantics
+### 语义 {#semantics}
 
-Matching the reference implementation:
+与参考实现保持一致：
 
-* questions run **concurrently**, bounded by `backend.max_concurrency`;
-* **any** failing question fails the whole request;
-* `request.total_timeout_seconds` bounds the whole request, not each question.
+* 所有问题**并发**执行，上限为 `backend.max_concurrency`；
+* **任一**问题失败则整次请求失败；
+* `request.total_timeout_seconds` 约束整次请求，不是单个问题。
 
-## Other endpoints
+## 其他端点 {#other-endpoints}
 
-| endpoint         | purpose                                       |
-| ---------------- | --------------------------------------------- |
-| `GET /healthz`   | liveness; never touches the backend            |
-| `GET /readyz`    | readiness; probes the backend, 503 when down   |
-| `GET /v1/models` | OpenAI-shaped model list                      |
+| 端点             | 作用                                       |
+| ---------------- | ------------------------------------------ |
+| `GET /healthz`   | 存活探针，不访问后端                       |
+| `GET /readyz`    | 就绪探针，探测后端，不可用返回 503         |
+| `GET /v1/models` | OpenAI 形状的模型列表                      |
 
-`/healthz` answers `{"status":"ok","version":"0.1.0"}` without a backend call, so it is
-safe as a container healthcheck. `/readyz` probes the backend and returns
-`{"status":"not_ready"}` with 503 when the inference server is unreachable or not loaded.
-`/v1/models` returns the backend's model list in the OpenAI shape.
+`/healthz` 返回 `{"status":"ok","version":"0.1.0"}` 且不打后端，因此可以安全地用作容器
+健康检查。`/readyz` 会探测后端，推理服务不可达或未加载完成时返回 `{"status":"not_ready"}`
+与 503。`/v1/models` 以 OpenAI 的形状返回后端的模型列表。
 
-Every response carries an `x-request-id` header; send your own to correlate logs.
+每个响应都带 `x-request-id` 头，可自带以关联日志。
 
-## Errors
+## 错误 {#errors}
 
 ```json
 {"error": {"code": "BACKEND_TIMEOUT", "message": "...", "detail": null, "request_id": "..."}}
 ```
 
-| code                             | status | when                                                    |
-| -------------------------------- | ------ | ------------------------------------------------------- |
-| `INVALID_REQUEST`                | 400    | schema/limit violation, bad image, unsupported feature  |
-| `BACKEND_CAPABILITY_UNSUPPORTED` | 400    | the model or backend cannot serve images                 |
-| `BACKEND_PROTOCOL_ERROR`         | 502    | backend answered with something unusable                 |
-| `BACKEND_UNAVAILABLE`            | 502    | connection refused / backend errored                     |
-| `BACKEND_NOT_READY`              | 503    | backend not loaded or not reachable                      |
-| `BACKEND_TIMEOUT`                | 504    | one question exceeded `backend.timeout_seconds`          |
-| `REQUEST_TIMEOUT`                | 504    | the request exceeded `request.total_timeout_seconds`     |
+| code                            | 状态码 | 触发条件                                     |
+| ------------------------------- | ------ | -------------------------------------------- |
+| `INVALID_REQUEST`               | 400    | schema / 限额违规、非法图片、不支持的能力     |
+| `BACKEND_CAPABILITY_UNSUPPORTED` | 400   | 模型或后端无法接收图片                        |
+| `BACKEND_PROTOCOL_ERROR`        | 502    | 后端返回了不可用的内容                        |
+| `BACKEND_UNAVAILABLE`           | 502    | 连接被拒 / 后端报错                           |
+| `BACKEND_NOT_READY`             | 503    | 后端未加载或不可达                            |
+| `BACKEND_TIMEOUT`               | 504    | 单个问题超过 `backend.timeout_seconds`        |
+| `REQUEST_TIMEOUT`               | 504    | 整次请求超过 `request.total_timeout_seconds`  |
 
-The `error` object always has `code`, `message`, `detail` and `request_id`. Validation
-errors from the request schema land in the same shape, so a client only needs one error
-parser.
+`error` 对象始终包含 `code`、`message`、`detail` 和 `request_id`。请求 schema 的校验错误
+也落进同样的结构，客户端因此只需要一个错误解析器。

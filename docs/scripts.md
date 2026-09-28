@@ -1,29 +1,28 @@
-# Scripts
+# 脚本 {#scripts}
 
-Every script lives in `scripts/`, takes `--help`, and talks to a gateway over HTTP — none
-of them import the application. That keeps them usable against a container, a remote box or
-a colleague's machine.
+所有脚本都在 `scripts/` 下，都支持 `--help`，都通过 HTTP 与网关通信——没有一个会 import
+应用本身。这让它们既可以指向容器，也可以指向远端机器或同事的环境。
 
 ```bash
 python scripts/<name>.py --help
 ```
 
-## The list
+## 列表 {#the-list}
 
-| script                   | purpose                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `smoke_test.py`          | end-to-end health check against a running gateway (`--image` for vision)       |
-| `compare_backends.py`    | A/B servers on the same cases; argmax agreement, mean abs delta, Brier distance |
-| `bench_triage.py`        | accuracy: gateway logprobs vs direct tool calling on SRE triage cases          |
-| `bench_speed_tokens.py`  | speed + output tokens: gateway vs direct tool calling (`--repeat N`)           |
-| `diagnose_severity.py`   | vague vs precise rubric across both paths (isolates wording vs design)         |
-| `probe_position_bias.py` | reorder candidates to tell position bias from semantic judgement               |
-| `probe_live.py`          | boundary checks against a live gateway (image limits, candidate limits)        |
-| `make_test_png.py`       | generate a tiny valid PNG without Pillow                                       |
+| 脚本                     | 用途                                                                 |
+| ------------------------ | -------------------------------------------------------------------- |
+| `smoke_test.py`          | 对运行中的网关做端到端健康检查（`--image` 测视觉）                   |
+| `compare_backends.py`    | 同一组用例 A/B 多个服务；argmax 一致性、概率偏移、Brier 距离         |
+| `bench_triage.py`        | 正确率：网关 logprobs vs 直连工具调用（SRE 分诊案例）                |
+| `bench_speed_tokens.py`  | 速度 + 输出 token：网关 vs 直连工具调用（`--repeat N`）              |
+| `diagnose_severity.py`   | 模糊 vs 精确评分标准在两条路径上的对照（区分措辞问题与设计问题）     |
+| `probe_position_bias.py` | 打乱候选顺序，区分位置偏见与语义判断                                 |
+| `probe_live.py`          | 对活动网关做边界检查（图片限额、候选数限额）                         |
+| `make_test_png.py`       | 不依赖 Pillow 生成一张极小的合法 PNG                                 |
 
-## Smoke test
+## 冒烟测试 {#smoke-test}
 
-The first thing to run after starting the gateway.
+启动网关后第一个该跑的脚本。
 
 ```bash
 python scripts/smoke_test.py --url http://127.0.0.1:8000
@@ -31,14 +30,12 @@ python scripts/smoke_test.py --url http://127.0.0.1:8000 --image screenshot.png
 python scripts/smoke_test.py --url http://127.0.0.1:8000 --json
 ```
 
-It hits `/healthz`, `/readyz` and `/v1/systemone`, validates that every answer has the
-correct shape, and prints the usage and diagnostics blocks. `--json` emits machine-readable
-output for CI.
+它会访问 `/healthz`、`/readyz` 和 `/v1/systemone`，校验每个答案的结构，并打印 usage 与
+diagnostics。`--json` 输出机器可读结果，便于放进 CI。
 
-## Comparing two backends
+## 对比两个后端 {#comparing-two-backends}
 
-The most useful script in the repository. It runs the same case set against several
-servers and reports what actually matters:
+仓库里最有用的脚本。它用同一组用例跑多个服务，只报告真正要紧的指标：
 
 ```bash
 python scripts/compare_backends.py \
@@ -56,77 +53,69 @@ llama                  n=15  p50=  62.4ms p95=  88.1ms mean=  67.0ms
 vllm                   n=15  p50=  41.9ms p95=  55.3ms mean=  44.8ms
 ```
 
-* **argmax agreement** — did the *ranking* survive?
-* **mean|dp|** — how far the probability vectors moved.
-* **Brier distance** — the mean squared gap between them. This is the number to watch:
-  high argmax agreement with a large Brier distance means a quantisation or backend change
-  quietly broke your thresholds.
+* **argmax 一致性**：排序是否保住；
+* **mean|dp|**：概率向量整体移动了多远；
+* **Brier 距离**：两个概率向量的均方差距。要盯的是这个数——argmax 一致但 Brier 距离大，
+  意味着换量化或换后端已经悄悄改坏了阈值。
 
-`--backend` takes `NAME=URL[+key:value]`, where the optional values are `model`, `api_key`,
-`top_logprobs`, `supports_images`. A `truncated: true` in any observation is reported as a
-warning, because a floored probability is a lower bound rather than an estimate.
+`--backend` 格式为 `NAME=URL[+key:value]`，可选值有 `model`、`api_key`、
+`top_logprobs`、`supports_images`。任何一次观测里出现 `truncated: true` 都会作为警告报出，
+因为被截断的概率是下界而不是估计值。
 
-## Accuracy: gateway vs direct tool calling
+## 正确率：网关 vs 直连工具调用 {#accuracy-gateway-vs-direct-tool-calling}
 
 ```bash
 python scripts/bench_triage.py --url http://127.0.0.1:8000 --repeat 3
 ```
 
-Six SRE triage cases with ground truth, run through both paths. It reports accuracy,
-latency and token counts side by side. On the reference benchmark (Qwen3.5-0.8B on
-llama.cpp, single-threaded, thinking disabled on both paths) both paths scored 3/4 with a
-precise rubric; the gateway emitted 3 output tokens against ~55 for the direct path.
+六个带标准答案的 SRE 分诊案例，两条路径都跑一遍，并排报告正确率、延迟与 token 数。在
+参考基准上（Qwen3.5-0.8B + llama.cpp，单线程，两条路径都关思考）两条路径都是 3/4；网关
+输出 3 个 token，直连约 55 个。
 
-## Speed and tokens
+## 速度与 token {#speed-and-tokens}
 
 ```bash
 python scripts/bench_speed_tokens.py --url http://127.0.0.1:8000 --repeat 3
 ```
 
-Warms both caches, then reports p50 / p95 / mean / min / max latency for the gateway and
-for the direct path, plus the speed ratio and the output-token ratio.
+先预热两条路径的缓存，然后报告网关与直连路径的 p50 / p95 / mean / min / max 延迟，以及
+速度比和输出 token 比。
 
-## Diagnosing the rubric
+## 诊断评分标准 {#diagnosing-the-rubric}
 
-When accuracy is poor, the question is usually *the wording*, not the gateway.
+正确率不理想时，问题通常在*措辞*，不在网关。
 
 ```bash
 python scripts/diagnose_severity.py --url http://127.0.0.1:8000
 ```
 
-Runs a vague rubric (`Total outage / Degraded / Minor`) against a precise one (thresholds
-decidable from the state) on both the gateway and the direct path, and includes two
-trivially-green cases. On the reference benchmark the vague rubric pushed both paths near
-chance — the direct path even answered a trivially-green case `sev1` — while the precise
-rubric fixed both at once. If this script shows a large gap, rewrite the criteria before
-touching any gateway setting.
+它在网关和直连两条路径上，对比模糊标准（`Total outage / Degraded / Minor`）与精确标准
+（可从 state 验证的阈值），并包含两个全绿的平凡案例。在参考基准上，模糊标准把两条路径
+都推到接近随机——直连甚至把一个全绿案例判成 `sev1`——而精确标准同时修好了两条。如果这个
+脚本显示出明显差距，先改写判据，别动任何网关配置。
 
-## Position bias
+## 位置偏见 {#position-bias}
 
 ```bash
 python scripts/probe_position_bias.py --url http://127.0.0.1:8000
 ```
 
-Asks the same question with the candidates in three different orders. If reordering changes
-which *letter* wins but not which *label* wins, the model is judging semantics and the
-distribution can be trusted. If the *label* flips, the model is reading position rather
-than meaning.
+用三种不同的候选顺序问同一个问题。如果打乱顺序只改变胜出的*字母*而不改变胜出的*标签*，
+说明模型在判断语义，分布可以信任；如果*标签*翻了，说明模型读的是位置而不是含义。
 
-## Boundary probes
+## 边界探针 {#boundary-probes}
 
 ```bash
 python scripts/probe_live.py --url http://127.0.0.1:8000
 ```
 
-Checks the documented limits against a live gateway: candidate counts at 2, 16 and 17,
-image limits, the unknown-key rejection, and the error codes. Useful after changing
-`max_questions` or the `multimodal` block.
+对着活动网关检查文档中承诺的限额：候选数取 2、16、17，图片限额，未知字段的拒绝，以及
+各个错误码。改过 `max_questions` 或 `multimodal` 之后很有用。
 
-## Making a test image
+## 生成测试图片 {#making-a-test-image}
 
 ```bash
 python scripts/make_test_png.py
 ```
 
-Writes a tiny valid PNG using only the standard library, so vision paths can be tested
-without Pillow or a sample image lying around.
+只用标准库写出一张极小的合法 PNG，这样测视觉路径就不需要 Pillow，也不需要现成的样例图。
