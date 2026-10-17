@@ -9,7 +9,8 @@ hide:
 <div class="jev-hero" markdown>
 
 自托管的 **Jev / System One 兼容**决策网关。对外只暴露你已经在调用的 `POST /v1/systemone`，
-决策层跑在自己的推理服务上，不依赖闭源的 TypeSafe API，并在同一契约上扩展了本地图片输入。
+决策层跑在自己的推理服务上，不依赖闭源的 TypeSafe API，并支持官方 `assets` 图片引用和
+`box` 视觉定位问题。
 
 网关只说一种协议：**OpenAI chat-completions API**（`POST /v1/chat/completions` 带
 `logprobs`）。任何实现了它的服务都能用——llama.cpp、vLLM、SGLang、Ollama、LM Studio、
@@ -122,10 +123,10 @@ prompt 上的一次前向传播。这正是 0.6B–4B 小模型能充当路由�
 | --- | --- |
 | 端点 | `POST /v1/systemone`、`GET /healthz`、`GET /readyz`、`GET /v1/models` |
 | 协议 | 带 `logprobs` 的 OpenAI chat-completions |
-| 问题类型 | `noul`、`choice`、`score` |
-| 单题候选数 | 2 – 16 |
+| 问题类型 | `noul`、`choice`、`score`、`box` |
+| Choice 候选数 / Score 档位 | 2 – 16 / 2 – 10 |
 | 单次请求问题数 | 1 – 64 |
-| 图片 | data URL、需开启的远程 URL、裸 base64 |
+| 图片 | JSON `assets` Base64 或 multipart 文件上传 |
 | 并发 | 问题并行执行，上限 `backend.max_concurrency` |
 | 许可 | Apache-2.0 |
 

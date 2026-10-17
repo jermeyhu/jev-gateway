@@ -12,13 +12,8 @@ English · [简体中文](https://github.com/jermeyhu/jev-gateway/blob/main/READ
 
 A self-hosted, **Jev / System One compatible** decision gateway. It exposes the single
 `POST /v1/systemone` endpoint you already program against, but runs the decision layer on
-your own inference server instead of the closed TypeSafe API — and extends the contract
-with local **image input**.
-
-The official Jev endpoint is text only, and its Pydantic AI client rejects file parts
-outright, so screenshots and camera frames could not be scored at all. This gateway is the
-drop-in replacement for the text path, and the same process can additionally score evidence
-that includes images.
+your own inference server instead of the hosted API. It supports TypeSafe's `assets` image
+references and the `box` visual localization primitive.
 
 The gateway speaks exactly one wire protocol: the **OpenAI chat-completions API**
 (`POST /v1/chat/completions` with `logprobs`). Any server that implements it works —

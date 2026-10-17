@@ -34,11 +34,11 @@ vLLM 和 SGLang 的 `backend.model` 必须与 `--served-model-name` 一致；留
 ## 读取 top-N 窗口 {#reading-the-top-n-window}
 
 每个返回的 token 都会映射到一个候选字母。`"A"` 和 `" A"` 都算 `A`，取其中概率最高的
-变体。落在 top-N 窗口外的候选会被截断到实际返回的最低 logprob，并在诊断中把该问题标记为
-`truncated`。
+变体。落在 top-N 窗口外的候选会被截断到实际返回的最低 logprob；为避免概率失真，应确保
+`backend.top_logprobs` 足以覆盖候选。
 
-如果出现 `truncated: true`，上调 `backend.top_logprobs`（最高 4096）并重新测量。被截断的
-概率是**下界**，不是估计值——建立在它之上的阈值并不可信。
+被截断的概率是**下界**，不是估计值——建立在它之上的阈值并不可信。为与 TypeSafe 响应
+保持一致，API 不公开内部截断诊断。
 
 !!! note "logprob 约定"
 

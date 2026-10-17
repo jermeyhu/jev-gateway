@@ -14,21 +14,7 @@ class Usage(ResponseModel):
     output_tokens: int
 
 
-class QuestionDiagnostic(ResponseModel):
-    latency_ms: float
-    truncated: bool = False
-    backend: str
-
-
-class Diagnostics(ResponseModel):
-    backend: str
-    model: str
-    total_latency_ms: float
-    questions: dict[str, QuestionDiagnostic]
-
-
 class SystemOneResponse(ResponseModel):
     model: str
     answers: dict[str, dict[str, Any]]
     usage: Usage
-    diagnostics: Diagnostics | None = None

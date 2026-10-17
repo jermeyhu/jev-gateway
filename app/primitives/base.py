@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.decision.ir import Candidate, DecisionTask
-from app.schemas.request import ChoiceQuestion, NoulQuestion, Question, ScoreQuestion
+from app.schemas.request import BoxQuestion, ChoiceQuestion, NoulQuestion, Question, ScoreQuestion
 from app.utils.imaging import ImageRef
 
 DEFAULT_NOUL_CRITERIA = ("Yes", "No")
@@ -19,9 +19,10 @@ def _letter(index: int) -> str:
 def build_candidates(question: Question) -> list[Candidate]:
     if isinstance(question, NoulQuestion):
         descriptions = (
-            (question.criteria.true, question.criteria.false)
-            if question.criteria is not None
-            else DEFAULT_NOUL_CRITERIA
+            question.criteria.true if question.criteria and question.criteria.true is not None
+            else DEFAULT_NOUL_CRITERIA[0],
+            question.criteria.false if question.criteria and question.criteria.false is not None
+            else DEFAULT_NOUL_CRITERIA[1],
         )
         return [
             Candidate(key="true", description=descriptions[0], letter=_letter(0)),
@@ -37,6 +38,8 @@ def build_candidates(question: Question) -> list[Candidate]:
             Candidate(key=str(index), description=description, letter=_letter(index))
             for index, description in enumerate(question.criteria)
         ]
+    if isinstance(question, BoxQuestion):
+        return []
     raise TypeError("unsupported primitive")
 
 
@@ -45,6 +48,7 @@ def to_decision_task(
     state: Any,
     question: Question,
     images: Sequence[ImageRef] = (),
+    model: str | None = None,
 ) -> DecisionTask:
     return DecisionTask(
         question_id=question_id,
@@ -53,4 +57,5 @@ def to_decision_task(
         instruction=question.instructions,
         candidates=build_candidates(question),
         images=list(images),
+        model=model,
     )

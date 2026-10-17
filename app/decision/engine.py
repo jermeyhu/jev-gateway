@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from app.decision.ir import DecisionTask
 from app.decision.prompt import build_messages
+from app.utils.errors import BackendProtocolError
 from app.utils.softmax import stable_softmax
 
 if TYPE_CHECKING:  # avoids a cycle: backends.base imports this module's types
@@ -23,6 +24,7 @@ class DecisionResult:
     input_tokens: int
     output_tokens: int
     latency_ms: float
+    model: str | None = None
 
 
 class DecisionEngine:
@@ -40,10 +42,32 @@ class DecisionEngine:
     async def decide(self, task: DecisionTask) -> DecisionResult:
         started = time.perf_counter()
         messages = build_messages(task, self.prompt_layout)
+        if task.primitive == "box":
+            if task.model is None:
+                generated = await self.backend.generate_json(messages, task.images)
+            else:
+                generated = await self.backend.generate_json(
+                    messages, task.images, task.model
+                )
+            answer = build_box_answer(generated.value)
+            return DecisionResult(
+                question_id=task.question_id,
+                answer=answer,
+                truncated=False,
+                input_tokens=generated.input_tokens,
+                output_tokens=generated.output_tokens,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+                model=generated.model,
+            )
         letters = [candidate.letter for candidate in task.candidates]
-        scores: CandidateScores = await self.backend.score_candidates(
-            messages, letters, task.images
-        )
+        if task.model is None:
+            scores: CandidateScores = await self.backend.score_candidates(
+                messages, letters, task.images
+            )
+        else:
+            scores = await self.backend.score_candidates(
+                messages, letters, task.images, task.model
+            )
         answer = build_answer(task, scores)
         return DecisionResult(
             question_id=task.question_id,
@@ -52,6 +76,7 @@ class DecisionEngine:
             input_tokens=scores.input_tokens,
             output_tokens=scores.output_tokens,
             latency_ms=(time.perf_counter() - started) * 1000.0,
+            model=scores.model,
         )
 
 
@@ -72,12 +97,14 @@ def build_answer(task: DecisionTask, scores: CandidateScores) -> dict[str, Any]:
 
     if task.primitive == "choice":
         best = max(candidates, key=lambda candidate: probabilities[candidate.letter])
+        confidence = choice_confidence(list(probabilities.values()))
         return {
             "type": "choice",
             "choice": best.key,
             "probabilities": {
                 candidate.key: probabilities[candidate.letter] for candidate in candidates
             },
+            "confidence": confidence,
         }
 
     if task.primitive == "score":
@@ -85,6 +112,19 @@ def build_answer(task: DecisionTask, scores: CandidateScores) -> dict[str, Any]:
         expected = sum(
             index * probabilities[candidate.letter] for index, candidate in enumerate(candidates)
         )
+        peak = max(
+            range(len(candidates)),
+            key=lambda index: probabilities[candidates[index].letter],
+        )
+        mean_peak_distance = sum(
+            probabilities[candidate.letter] * abs(index - peak)
+            for index, candidate in enumerate(candidates)
+        )
+        middle = (len(candidates) - 1) / 2
+        uniform_distance = sum(abs(index - middle) for index in range(len(candidates))) / len(
+            candidates
+        )
+        confidence = max(0.0, 1.0 - mean_peak_distance / uniform_distance)
         return {
             "type": "score",
             "score": expected,
@@ -92,6 +132,42 @@ def build_answer(task: DecisionTask, scores: CandidateScores) -> dict[str, Any]:
             "probabilities": {
                 candidate.key: probabilities[candidate.letter] for candidate in candidates
             },
+            "confidence": confidence,
         }
 
     raise ValueError(f"unsupported primitive: {task.primitive!r}")
+
+
+def choice_confidence(probabilities: Sequence[float]) -> float:
+    count = len(probabilities)
+    maximum = max(probabilities)
+    return max(0.0, (count * maximum - 1.0) / (count - 1.0))
+
+
+def build_box_answer(value: dict[str, Any]) -> dict[str, Any]:
+    confidence = value.get("c", value.get("confidence"))
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise BackendProtocolError("backend returned an invalid box answer")
+    if "b" in value:
+        coordinates = value["b"]
+        if not isinstance(coordinates, list) or len(coordinates) != 4:
+            raise BackendProtocolError("backend returned invalid compact box coordinates")
+        box = dict(zip(("top", "bottom", "left", "right"), coordinates, strict=True))
+    else:
+        full_box = value.get("box")
+        if not isinstance(full_box, dict):
+            raise BackendProtocolError("backend returned an invalid box answer")
+        box = full_box
+    edges: dict[str, float] = {}
+    for edge in ("top", "bottom", "left", "right"):
+        coordinate = box.get(edge)
+        if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)):
+            raise BackendProtocolError(f"backend returned an invalid box {edge} edge")
+        if not 0.0 <= coordinate <= 1.0:
+            raise BackendProtocolError(f"backend returned a box {edge} edge outside 0 to 1")
+        edges[edge] = float(coordinate)
+    if edges["left"] >= edges["right"] or edges["top"] >= edges["bottom"]:
+        raise BackendProtocolError("backend returned inverted box edges")
+    if not 0.0 <= confidence <= 1.0:
+        raise BackendProtocolError("backend returned box confidence outside 0 to 1")
+    return {"type": "box", "box": edges, "confidence": float(confidence)}

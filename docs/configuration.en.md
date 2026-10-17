@@ -49,10 +49,9 @@ names the variable — a typo is a crash, never a silent fallback.
 | `JEV_REQUEST_MAX_QUESTIONS`               | `64`                    | 1 – 64 questions per request              |
 | `JEV_REQUEST_TOTAL_TIMEOUT_SECONDS`       | `60.0`                  | Whole-request budget                      |
 | `JEV_REQUEST_PROMPT_LAYOUT`               | `fused`                 | `fused` \| `split`                       |
-| `JEV_MULTIMODAL_ENABLED`                  | `true`                  | `false` rejects any `images` with 400     |
+| `JEV_MULTIMODAL_ENABLED`                  | `true`                  | `false` rejects any `assets` with 400     |
 | `JEV_MULTIMODAL_MAX_IMAGES`               | `4`                     | Images per request                        |
 | `JEV_MULTIMODAL_MAX_IMAGE_BYTES`          | `5242880` (5 MiB)       | Per image, measured after base64 decode   |
-| `JEV_MULTIMODAL_ALLOW_REMOTE_URLS`        | `false`                 | Required before `https://` images are read |
 | `JEV_MULTIMODAL_ALLOWED_MIME_PREFIXES`    | `image/`                | Comma-separated                           |
 | `JEV_LOGGING_LEVEL`                       | `INFO`                  |                                           |
 
@@ -81,8 +80,9 @@ models, or that insists the client name one (vLLM, SGLang with multiple served
 models), should be pinned explicitly.
 
 `TOP_LOGPROBS` is the size of the next-token window. With two to four candidates
-the default of `128` is already generous; raise it when diagnostics show
-`truncated: true`. Valid range is 16 – 4096.
+the default of `128` is already generous; raise it if candidate results are unstable.
+Out-of-window candidates are floored internally; the API does not expose this diagnostic.
+Valid range is 16 – 4096.
 
 !!! warning "Servers have their own cap, and the default of 128 can fail every request"
 
@@ -146,15 +146,10 @@ or `split` (cache friendly). Both are described in
 
 | Variable                          | Default             | Meaning                                    |
 | --------------------------------- | ------------------- | ------------------------------------------ |
-| `ENABLED`                         | `true`              | `false` rejects any `images` with 400      |
+| `ENABLED`                         | `true`              | `false` rejects any `assets` with 400      |
 | `MAX_IMAGES`                      | `4`                 | Images per request                         |
 | `MAX_IMAGE_BYTES`                 | `5242880` (5 MiB)   | Per image, after base64 decode             |
-| `ALLOW_REMOTE_URLS`               | `false`             | Required before `https://` images are read |
 | `ALLOWED_MIME_PREFIXES`           | `image/`            | Comma-separated MIME prefixes              |
-
-`ALLOW_REMOTE_URLS` defaults to `false` because a remote URL makes the gateway
-fetch an arbitrary address chosen by the caller — a server-side request forgery
-surface. Only turn it on when both ends are yours.
 
 ### Logging `JEV_LOGGING_LEVEL` {#logging}
 

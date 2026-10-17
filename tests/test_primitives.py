@@ -29,6 +29,17 @@ def test_noul_with_criteria_keeps_client_labels() -> None:
     assert [c.letter for c in candidates] == ["A", "B"]
 
 
+def test_noul_criteria_can_define_one_side() -> None:
+    question = NoulQuestion(
+        type="noul", instructions="is it safe?", criteria={"true": {"label": "safe"}}
+    )
+    candidates = build_candidates(question)
+    assert [candidate.description for candidate in candidates] == [
+        {"label": "safe"},
+        "No",
+    ]
+
+
 def test_choice_preserves_insertion_order() -> None:
     question = ChoiceQuestion(
         type="choice",
@@ -53,6 +64,12 @@ def test_letters_go_past_z_in_order() -> None:
         criteria={chr(ord("a") + i): f"option {i}" for i in range(16)},
     )
     assert [c.letter for c in build_candidates(question)] == list("ABCDEFGHIJKLMNOP")
+
+
+def test_score_supports_ten_levels_but_not_more() -> None:
+    ScoreQuestion(type="score", instructions="rate", criteria=[str(i) for i in range(10)])
+    with pytest.raises(ValueError, match="2 to 10 levels"):
+        ScoreQuestion(type="score", instructions="rate", criteria=[str(i) for i in range(11)])
 
 
 def test_to_decision_task_carries_state_and_images() -> None:

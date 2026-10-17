@@ -36,12 +36,12 @@ auto-detect from `/v1/models`.
 
 Every returned token is mapped onto a candidate letter. `"A"` and `" A"` both count as
 `A`; the most likely variant wins. A candidate outside the top-N window is floored at the
-least likely logprob actually returned, and the question is flagged `truncated` in the
-diagnostics.
+least likely logprob actually returned. Set `backend.top_logprobs` high enough to cover the
+candidate set to avoid distorted probabilities.
 
-If `truncated: true` shows up, raise `backend.top_logprobs` (up to 4096) and re-measure. A
-floored candidate is a *lower bound*, not an estimate — a threshold built on top of a
-floored probability is not trustworthy.
+A floored candidate is a *lower bound*, not an estimate — a threshold built on top of a
+floored probability is not trustworthy. Internal truncation diagnostics are omitted from
+the API response to match the TypeSafe response shape.
 
 !!! note "Logprob conventions"
 

@@ -5,7 +5,7 @@ import math
 import pytest
 
 from app.backends.base import CandidateScores
-from app.decision.engine import DecisionEngine, build_answer
+from app.decision.engine import DecisionEngine, build_answer, build_box_answer
 from app.decision.ir import Candidate, DecisionTask
 from app.primitives.base import to_decision_task
 from app.schemas.request import ChoiceQuestion, NoulQuestion, ScoreQuestion
@@ -71,6 +71,7 @@ def test_choice_answer_picks_the_argmax_key() -> None:
     assert answer["type"] == "choice"
     assert answer["choice"] == "b"
     assert list(answer["probabilities"]) == ["a", "b", "c"]
+    assert 0.0 <= answer["confidence"] <= 1.0
 
 
 def test_score_answer_is_an_expected_value_with_legend() -> None:
@@ -82,6 +83,7 @@ def test_score_answer_is_an_expected_value_with_legend() -> None:
     assert answer["score"] == pytest.approx(0.75)
     assert answer["legend"] == {"0": "low", "1": "mid", "2": "high"}
     assert set(answer["probabilities"]) == {"0", "1", "2"}
+    assert 0.0 <= answer["confidence"] <= 1.0
 
 
 def test_ties_resolve_to_the_first_candidate() -> None:
@@ -91,6 +93,31 @@ def test_ties_resolve_to_the_first_candidate() -> None:
     assert probabilities["a"] == pytest.approx(probabilities["b"])
     assert probabilities["a"] > 0.49
     assert probabilities["c"] < 0.001
+
+
+def test_choice_confidence_matches_the_official_formula() -> None:
+    answer = build_answer(
+        choice_task(),
+        scores({"A": math.log(0.6), "B": math.log(0.3), "C": math.log(0.1)}),
+    )
+    assert answer["confidence"] == pytest.approx(0.4)
+
+
+def test_box_answer_rejects_out_of_range_edges() -> None:
+    from app.utils.errors import BackendProtocolError
+
+    with pytest.raises(BackendProtocolError, match="outside 0 to 1"):
+        build_box_answer(
+            {"box": {"top": 0.0, "bottom": 1.2, "left": 0.0, "right": 1.0}, "confidence": 0.8}
+        )
+
+
+def test_compact_box_answer_maps_to_the_public_shape() -> None:
+    assert build_box_answer({"b": [0.2, 0.8, 0.1, 0.9], "c": 0.92}) == {
+        "type": "box",
+        "box": {"top": 0.2, "bottom": 0.8, "left": 0.1, "right": 0.9},
+        "confidence": 0.92,
+    }
 
 
 def test_unknown_primitive_is_rejected() -> None:

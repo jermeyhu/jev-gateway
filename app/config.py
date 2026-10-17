@@ -206,7 +206,6 @@ class MultimodalSettings:
     enabled: bool = True
     max_images: int = 4
     max_image_bytes: int = 5 * 1024 * 1024
-    allow_remote_urls: bool = False
     allowed_mime_prefixes: tuple[str, ...] = ("image/",)
 
 
@@ -289,7 +288,6 @@ def _build(environ: Mapping[str, str]) -> Settings:
             enabled=_bool(environ, "multimodal.enabled", True),
             max_images=max_images,
             max_image_bytes=_int(environ, "multimodal.max_image_bytes", 5 * 1024 * 1024),
-            allow_remote_urls=_bool(environ, "multimodal.allow_remote_urls", False),
             allowed_mime_prefixes=_tuple(environ, "multimodal.allowed_mime_prefixes", ("image/",)),
         ),
         log_level=_string(environ, "logging.level", "INFO").upper(),

@@ -18,7 +18,7 @@ from app.decision.prompt import Message  # noqa: E402
 from app.utils.imaging import ImageRef  # noqa: E402
 
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 16).decode()
-IMAGE = ImageRef("data_url", "image/png", PNG, f"data:image/png;base64,{PNG}")
+IMAGE = ImageRef("image/png", PNG, f"data:image/png;base64,{PNG}", "test-image")
 
 
 def message_text(message: Message) -> str:
@@ -65,6 +65,7 @@ class FakeBackend(DecisionBackend):
         messages: list[Message],
         letters: Sequence[str],
         images: Sequence[ImageRef] = (),
+        model: str | None = None,
     ) -> CandidateScores:
         self.calls.append((messages, tuple(letters), tuple(images)))
         if self.latency:

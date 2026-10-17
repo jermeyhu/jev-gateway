@@ -9,7 +9,7 @@ from app.utils.imaging import ImageRef
 @dataclass(frozen=True, slots=True)
 class Candidate:
     key: str
-    description: str
+    description: Any
     letter: str
 
 
@@ -18,6 +18,7 @@ class DecisionTask:
     question_id: str
     primitive: str
     state: Any
-    instruction: str
+    instruction: Any
     candidates: list[Candidate]
     images: list[ImageRef] = field(default_factory=list)
+    model: str | None = None

@@ -69,6 +69,7 @@ def openai_server() -> httpx.MockTransport:
                     }
                 ],
                 "usage": {"prompt_tokens": 21, "completion_tokens": 1},
+                "model": payload.get("model"),
             },
         )
 
@@ -97,6 +98,7 @@ async def gateway(
 
 
 PAYLOAD = {
+    "model": "mock-gguf",
     "state": {"error_rate": 0.42, "p99_latency_ms": 3100, "recent_deploy": True},
     "questions": {
         "healthy": {"type": "noul", "instructions": "Is the service healthy?"},
@@ -145,11 +147,9 @@ async def test_full_stack_round_trip() -> None:
     assert urgency["score"] == pytest.approx(expected)
 
     assert body["usage"]["input_tokens"] == 63  # 3 questions x 21 tokens
+    assert body["usage"]["output_tokens"] == 3  # one decoded token per question
     assert body["model"] == "mock-gguf"
-    assert body["diagnostics"]["backend"] == "openai"
-    assert all(
-        item["truncated"] is False for item in body["diagnostics"]["questions"].values()
-    )
+    assert set(body) == {"model", "answers", "usage"}
 
 
 async def test_one_backend_call_per_question() -> None:
@@ -157,7 +157,7 @@ async def test_one_backend_call_per_question() -> None:
         transport_seen: list[dict[str, Any]] = []
         original = backend.score_candidates
 
-        async def spy(messages, letters, images=()):
+        async def spy(messages, letters, images=(), model=None):
             transport_seen.append({"letters": list(letters), "images": len(list(images))})
             return await original(messages, letters, images)
 
@@ -184,6 +184,7 @@ async def test_prompt_layout_split_reuses_the_evidence_prefix() -> None:
 async def test_more_than_sixteen_candidates_is_rejected() -> None:
     """The gateway refuses any question with more than 16 candidates."""
     payload = {
+        "model": "jev-latest",
         "state": "x",
         "questions": {
             "too_many": {
@@ -195,12 +196,13 @@ async def test_more_than_sixteen_candidates_is_rejected() -> None:
     }
     async with gateway() as (client, _backend):
         response = await client.post("/v1/systemone", json=payload)
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_REQUEST"
 
 
 async def test_sixteen_candidates_is_accepted() -> None:
     payload = {
+        "model": "jev-latest",
         "state": "x",
         "questions": {
             "at_limit": {

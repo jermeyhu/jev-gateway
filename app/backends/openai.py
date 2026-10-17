@@ -22,10 +22,11 @@ the question is flagged ``truncated``.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from app.backends.base import CandidateScores, DecisionBackend
+from app.backends.base import CandidateScores, DecisionBackend, GeneratedJSON
 from app.utils.errors import BackendProtocolError
 from app.utils.imaging import ImageRef
 
@@ -62,6 +63,7 @@ class OpenAICompatibleBackend(DecisionBackend):
         messages: list[Message],
         letters: Sequence[str],
         images: Sequence[ImageRef] = (),
+        model: str | None = None,
     ) -> CandidateScores:
         self.ensure_images_supported(images)
         # Vendor extras go in first so the contract fields below always win: a
@@ -77,8 +79,8 @@ class OpenAICompatibleBackend(DecisionBackend):
                 "top_logprobs": self.settings.top_logprobs,
             }
         )
-        if self.settings.model:
-            payload["model"] = self.settings.model
+        if model or self.settings.model:
+            payload["model"] = model or self.settings.model
 
         path = "/v1/chat/completions"
         body = self._json(await self._post(path, payload), path)
@@ -99,6 +101,50 @@ class OpenAICompatibleBackend(DecisionBackend):
             truncated=bool(missing),
             input_tokens=self._token_count(usage, "prompt_tokens"),
             output_tokens=self._token_count(usage, "completion_tokens"),
+            model=body.get("model") if isinstance(body.get("model"), str) else None,
+        )
+
+    async def generate_json(
+        self,
+        messages: list[Message],
+        images: Sequence[ImageRef] = (),
+        model: str | None = None,
+    ) -> GeneratedJSON:
+        self.ensure_images_supported(images)
+        payload: dict[str, Any] = dict(self.settings.extra_body)
+        payload.update(
+            {
+                "messages": list(messages),
+                "max_tokens": 64,
+                "temperature": 0.0,
+                "stream": False,
+                "response_format": {"type": "json_object"},
+            }
+        )
+        if model or self.settings.model:
+            payload["model"] = model or self.settings.model
+
+        path = "/v1/chat/completions"
+        body = self._json(await self._post(path, payload), path)
+        choices = body.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise BackendProtocolError("backend response contained no choices")
+        message = choices[0].get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, str):
+            raise BackendProtocolError("backend response contained no JSON text")
+        try:
+            result = json.loads(content)
+        except ValueError as exc:
+            raise BackendProtocolError("backend returned invalid JSON") from exc
+        if not isinstance(result, dict):
+            raise BackendProtocolError("backend JSON response was not an object")
+        usage = body.get("usage")
+        return GeneratedJSON(
+            value=result,
+            input_tokens=self._token_count(usage, "prompt_tokens"),
+            output_tokens=self._token_count(usage, "completion_tokens"),
+            model=body.get("model") if isinstance(body.get("model"), str) else None,
         )
 
     @staticmethod

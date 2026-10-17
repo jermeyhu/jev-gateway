@@ -55,6 +55,7 @@ curl http://127.0.0.1:8000/healthz
 curl -X POST http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
   -d '{
+    "model": "jev-latest",
     "state": {"error_rate": 0.42, "p99_latency_ms": 3100, "recent_deploy": true},
     "questions": {
       "is_healthy": {"type": "noul", "instructions": "Is the service healthy?"},
@@ -115,6 +116,7 @@ curl -s http://127.0.0.1:8000/readyz
 curl -s http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
   -d '{
+      "model": "jev-latest",
         "state": {"error_rate": 0.31, "p99_latency_ms": 4100},
         "questions": {
           "severity": {
@@ -131,8 +133,8 @@ curl -s http://127.0.0.1:8000/v1/systemone \
 ```
 
 `/healthz` 证明进程活着，`/readyz` 证明后端已就绪并返回它加载的模型名，最后一个请求
-会返回答案、`usage` 与 `diagnostics`。带图验证把 `state` 换成
-`{"images": ["data:image/png;base64,..."]}`。
+会返回官方结构的 `model`、`answers` 和 `usage`。图片请求使用 `assets` 和引用字符串，见
+[图片指南](images.md)。
 
 !!! note "vLLM 与 SGLang"
 

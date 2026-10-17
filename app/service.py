@@ -9,15 +9,13 @@ from app.decision.coordinator import CoordinatedResult, Coordinator
 from app.decision.engine import DecisionEngine
 from app.decision.ir import DecisionTask
 from app.primitives.base import build_candidates, to_decision_task
-from app.schemas.request import Question, SystemOneRequest
+from app.schemas.request import BoxQuestion, Question, SystemOneRequest
 from app.schemas.response import (
-    Diagnostics,
-    QuestionDiagnostic,
     SystemOneResponse,
     Usage,
 )
 from app.utils.errors import InvalidRequest
-from app.utils.imaging import ImageRef, parse_images
+from app.utils.imaging import ImageRef, parse_assets, referenced_assets
 
 
 class DecisionService:
@@ -42,19 +40,41 @@ class DecisionService:
         await self.backend.check_ready()
 
     def build_tasks(self, payload: SystemOneRequest) -> tuple[list[DecisionTask], list[ImageRef]]:
-        images = parse_images(payload.images, self.settings.multimodal)
-        self.backend.ensure_images_supported(images)
+        assets = parse_assets(payload.assets, self.settings.multimodal)
         questions = payload.questions.root
         if len(questions) > self.settings.request.max_questions:
             raise InvalidRequest(
                 f"too many questions: {len(questions)} "
                 f"(limit {self.settings.request.max_questions})"
             )
-        tasks = [
-            self._to_task(question_id, payload.state, question, images)
-            for question_id, question in questions.items()
-        ]
-        return tasks, images
+        request_references = referenced_assets(
+            {"state": payload.state, "questions": [q.model_dump() for q in questions.values()]},
+            assets,
+        )
+        used = {image.reference for image in request_references}
+        unused = set(assets) - used
+        if unused:
+            raise InvalidRequest(f"unreferenced image assets: {', '.join(sorted(unused))}")
+        self.backend.ensure_images_supported(request_references)
+
+        tasks: list[DecisionTask] = []
+        for question_id, question in questions.items():
+            question_images = [
+                *referenced_assets(payload.state, assets),
+                *referenced_assets(question.model_dump(), assets),
+            ]
+            if isinstance(question, BoxQuestion) and not question_images:
+                raise InvalidRequest("box questions require a referenced image asset")
+            tasks.append(
+                self._to_task(
+                    question_id,
+                    payload.state,
+                    question,
+                    question_images,
+                    payload.model,
+                )
+            )
+        return tasks, request_references
 
     @staticmethod
     def _to_task(
@@ -62,6 +82,7 @@ class DecisionService:
         state: object,
         question: Question,
         images: list[ImageRef],
+        model: str,
     ) -> DecisionTask:
         """Build a task, refusing more candidates than the hard ceiling.
 
@@ -75,32 +96,19 @@ class DecisionService:
                 f"question {question_id!r} has {candidate_count} candidates "
                 f"(limit {MAX_CANDIDATES})"
             )
-        return to_decision_task(question_id, state, question, images)
+        return to_decision_task(question_id, state, question, images, model)
 
     async def systemone(self, payload: SystemOneRequest) -> SystemOneResponse:
         tasks, _ = self.build_tasks(payload)
         result: CoordinatedResult = await self.coordinator.run(tasks)
         return to_response(
-            result, model=self.model_name, backend=self.backend.type
+            result, model=result.model or payload.model
         )
 
 
-def to_response(result: CoordinatedResult, *, model: str, backend: str) -> SystemOneResponse:
+def to_response(result: CoordinatedResult, *, model: str) -> SystemOneResponse:
     return SystemOneResponse(
         model=model,
         answers=result.answers,
         usage=Usage(input_tokens=result.input_tokens, output_tokens=result.output_tokens),
-        diagnostics=Diagnostics(
-            backend=backend,
-            model=model,
-            total_latency_ms=round(result.total_latency_ms, 3),
-            questions={
-                qid: QuestionDiagnostic(
-                    latency_ms=round(item.latency_ms, 3),
-                    truncated=item.truncated,
-                    backend=backend,
-                )
-                for qid, item in result.per_question.items()
-            },
-        ),
     )

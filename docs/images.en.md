@@ -1,37 +1,61 @@
 # Images
 
-Image input is an extension of the reference contract. The official Jev endpoint is text
-only (`No image, audio, or video input`) and its Pydantic AI client raises
-`UserError: Files are not supported by this model`; this gateway replaces the text path and
-additionally scores evidence that contains screenshots or camera frames.
-
-Clients written against the hosted service still work — they simply ignore the field.
+Images use the TypeSafe `assets` reference format. Each asset is keyed by a reference string
+used in a string value in `state`, `instructions`, or `criteria`. Responses never include
+image data.
 
 ## How images are attached
 
-Images attach to the **front of the first user message**, so the vision encoder result and
-the evidence prefill stay cached across all questions of one request. The gateway builds
-OpenAI content parts of the form:
+The gateway turns each asset into an OpenAI image content part and sends it with the state and
+questions that reference it:
 
 ```json
 {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
 ```
 
-and appends the text part after them. With no images the content stays a plain string.
+Assets not referenced by state or a question are rejected. Requests containing images must
+include `TypeSafe-Danger-Zone-Images: true`.
 
 ## Accepted forms
 
-| form                                | example                                     | notes                                       |
-| ----------------------------------- | ------------------------------------------- | ------------------------------------------- |
-| data URL                            | `data:image/jpeg;base64,...`                | forwarded verbatim                          |
-| remote URL                          | `https://example.com/shot.png`              | only with `multimodal.allow_remote_urls: true` |
-| raw base64                          | `iVBORw0KGgo...`                            | media type sniffed from the magic bytes     |
+| form             | example                                                           | notes                                  |
+| ---------------- | ----------------------------------------------------------------- | -------------------------------------- |
+| JSON Base64      | `{"type":"image","format":"png","data_base64":"..."}` | standard Base64, no data URL prefix    |
+| multipart file   | `{"type":"image","part":"photo"}`                          | `part` names the uploaded file field   |
 
-Sniffed formats: jpeg, png, gif, bmp, tiff, webp. Whitespace inside base64 (line-wrapped
-data URIs) is stripped before decoding.
+PNG, JPG, and JPEG are supported. Multipart file parts may use `image/png`, `image/jpeg`,
+`image/jpg`, or `application/octet-stream`; the gateway checks the file signature.
 
-Anything else is rejected with `INVALID_REQUEST`: a non-image media type, undecodable
-base64, an unrecognised format, too many images, or an oversized one.
+Every asset must be referenced. References are limited to 1,024 UTF-8 bytes; image size is
+bounded by gateway configuration. Unreferenced assets, invalid or mismatched formats, invalid
+Base64, and exceeded limits return `INVALID_REQUEST`.
+
+### JSON Base64 example
+
+```json
+{
+  "model": "jev-latest",
+  "state": {"photo": "photo-uuid"},
+  "assets": {
+    "photo-uuid": {"type": "image", "format": "jpg", "data_base64": "/9j/4AA..."}
+  },
+  "questions": {
+    "person_present": {
+      "type": "noul",
+      "instructions": "Is there a person in `photo`?"
+    }
+  }
+}
+```
+
+### Multipart example
+
+```bash
+curl http://127.0.0.1:8000/v1/systemone \
+  -H 'TypeSafe-Danger-Zone-Images: true' \
+  -F 'request={"model":"jev-latest","state":{"photo":"photo-uuid"},"assets":{"photo-uuid":{"type":"image","part":"photo-file"}},"questions":{"person_present":{"type":"noul","instructions":"Is there a person in `photo`?"}}};type=application/json' \
+  -F 'photo-file=@door.jpg;type=image/jpeg'
+```
 
 ## Limits
 
@@ -39,10 +63,9 @@ Limits come from the `multimodal` config block, not from hard-coded constants.
 
 | key                     | default              | meaning                                        |
 | ----------------------- | -------------------- | ---------------------------------------------- |
-| `enabled`               | `true`               | `false` rejects any `images` field with a 400  |
+| `enabled`               | `true`               | `false` rejects any `assets` field with a 400 |
 | `max_images`            | `4`                  | images per request                              |
 | `max_image_bytes`       | `5242880` (5 MiB)    | per image, measured after base64 decoding       |
-| `allow_remote_urls`     | `false`              | opt in to `https://` references                 |
 | `allowed_mime_prefixes` | `["image/"]`         | accepted media types                            |
 
 ```yaml
@@ -50,16 +73,8 @@ multimodal:
   enabled: true
   max_images: 4
   max_image_bytes: 5242880
-  allow_remote_urls: false
   allowed_mime_prefixes: ["image/"]
 ```
-
-!!! danger "Remote URLs are opt-in for a reason"
-
-    With `allow_remote_urls: true` the gateway fetches whatever URL the caller supplies.
-    That is a server-side request forgery surface: a caller can make your gateway reach
-    `http://169.254.169.254/` or anything inside your network. Enable it only when both
-    ends are yours.
 
 ## When the backend cannot see
 
@@ -87,13 +102,16 @@ and multiple questions, use `split`.
 
 ## Testing it
 
-Read the file into a data URL and send it directly:
+Use a UUID reference and put the image's Base64 in an asset:
 
 ```bash
 curl -s http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
+  -H 'TypeSafe-Danger-Zone-Images: true' \
   -d "{
-        \"state\": {\"images\": [\"data:image/png;base64,$(base64 -w0 shot.png)\"]},
+        \"model\": \"jev-latest\",
+        \"state\": {\"screenshot\": \"screen-uuid\"},
+        \"assets\": {\"screen-uuid\": {\"type\": \"image\", \"format\": \"png\", \"data_base64\": \"$(base64 -w0 shot.png)\"}},
         \"questions\": {
           \"is_screenshot_of_an_error\": {
             \"type\": \"noul\",
@@ -107,6 +125,5 @@ curl -s http://127.0.0.1:8000/v1/systemone \
       }"
 ```
 
-If `answers` has the right shape and `diagnostics.questions.*.truncated` is `false`, the
-image path works. Comparing `usage.input_tokens` against a run without images also shows
-whether the picture was actually encoded.
+If `answers` has the expected shape and `usage.input_tokens` is higher than a run without
+images, the image reached the model input.

@@ -10,8 +10,8 @@ hide:
 
 A self-hosted, **Jev / System One compatible** decision gateway. It exposes the single
 `POST /v1/systemone` endpoint you already program against, but runs the decision layer on
-your own inference server instead of the closed TypeSafe API — and extends the contract
-with local **image input**.
+your own inference server instead of the closed TypeSafe API. It supports the official
+`assets` image references and the `box` visual localization primitive.
 
 The gateway speaks exactly one wire protocol: the **OpenAI chat-completions API**
 (`POST /v1/chat/completions` with `logprobs`). Any server that implements it works —
@@ -137,10 +137,10 @@ which *label* wins, and the probability mass tracks the evidence (a global outag
 | --- | --- |
 | Endpoints | `POST /v1/systemone`, `GET /healthz`, `GET /readyz`, `GET /v1/models` |
 | Protocols | OpenAI chat-completions with `logprobs` |
-| Question types | `noul`, `choice`, `score` |
-| Candidates per question | 2 – 16 |
+| Question types | `noul`, `choice`, `score`, `box` |
+| Choice options / Score levels | 2 – 16 / 2 – 10 |
 | Questions per request | 1 – 64 |
-| Images | data URLs, opt-in remote URLs, raw base64 |
+| Images | JSON `assets` Base64 or multipart file upload |
 | Concurrency | questions run in parallel, bounded by `backend.max_concurrency` |
 | License | Apache-2.0 |
 

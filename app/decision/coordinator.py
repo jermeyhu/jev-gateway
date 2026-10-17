@@ -26,6 +26,7 @@ class CoordinatedResult:
     output_tokens: int
     per_question: dict[str, DecisionResult]
     total_latency_ms: float
+    model: str | None = None
 
 
 class Coordinator:
@@ -75,6 +76,7 @@ class Coordinator:
             output_tokens=sum(result.output_tokens for result in per_question.values()),
             per_question=per_question,
             total_latency_ms=(time.perf_counter() - started) * 1000.0,
+            model=next((result.model for result in per_question.values() if result.model), None),
         )
 
     async def _run_one(self, task: DecisionTask) -> DecisionResult:

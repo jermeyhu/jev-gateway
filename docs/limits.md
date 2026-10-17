@@ -3,9 +3,9 @@
 ## 已知限制 {#known-limits}
 
 * `noul` 概率是只对两个候选字母做 softmax；阈值要在自己的标注集上校准。
-* 单个问题最多 **16 个候选**，超出以 `INVALID_REQUEST` 拒绝。
-* 诊断里出现 `truncated: true` 说明有候选被截断；上调 `top_logprobs`。
-* 图片是对参考契约的扩展，按托管服务写的客户端仍可运行，但会忽略该字段。
+* Choice 当前最多 **16 个候选**，Score 最多 **10 档**；超出会被拒绝。
+* 候选落在 `top_logprobs` 窗口之外时概率会被截断；API 不公开该内部诊断，需自行设置足够大的窗口。
+* Box 和图片使用 TypeSafe 的资产引用格式；图像及 box 功能仍取决于本地后端是否支持视觉输入。
 * 超出后端真实能力的部分应靠水平扩展解决，而不是继续调高 `max_concurrency`。
 
 ## 校准 {#calibration}
@@ -70,10 +70,10 @@ prompt，而是减少往返次数或换更近的接入点。
 不会。任一问题失败则整次请求失败，报出的是按问题顺序的第一个错误。这与参考实现一致——
 一组决策只有作为整体才有意义。
 
-### `truncated: true` 怎么办？ {#truncated-true-what-now}
+### 候选概率不稳定怎么办？ {#candidate-probabilities-unstable}
 
-说明某个候选字母落在 `top_logprobs` 窗口之外，被截断到实际返回的最低 logprob。那是下界，
-不是估计值。上调 `backend.top_logprobs`（16 – 4096）并重新测量。
+某个候选字母可能落在 `top_logprobs` 窗口之外，被截断到实际返回的最低 logprob。那是下界，
+不是估计值。API 不公开内部截断标记；可上调 `backend.top_logprobs`（16 – 4096）并重新测量。
 
 上调之前先看[静默失败](backends.md#silent-logprobs-null)那节：服务端有自己的上限，超限
 不报错、只是把 `logprobs` 变成 `null`。用网关当前的窗口先去探一下，确认服务端接受得

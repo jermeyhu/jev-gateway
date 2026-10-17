@@ -83,6 +83,48 @@ async def test_reads_candidate_logprobs() -> None:
     assert "cache_prompt" not in payload
 
 
+async def test_model_override_is_sent_to_the_backend() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        body = chat_body([("A", -0.1)])
+        body["model"] = "resolved-model"
+        return httpx.Response(200, json=body)
+
+    backend = make(handler)
+    result = await backend.score_candidates(MESSAGES, ["A"], model="requested-model")
+    assert seen[0]["model"] == "requested-model"
+    assert result.model == "resolved-model"
+
+
+async def test_generates_json_for_structured_outputs() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        content = (
+            '{"b":[0.1,0.8,0.2,0.9],"c":0.8}'
+        )
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": content}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 8},
+                "model": "jev-1.14.0",
+            },
+        )
+
+    backend = make(handler)
+    generated = await backend.generate_json(MESSAGES, model="box-model")
+    assert generated.value["c"] == 0.8
+    assert (generated.input_tokens, generated.output_tokens) == (12, 8)
+    assert generated.model == "jev-1.14.0"
+    assert seen[0]["model"] == "box-model"
+    assert seen[0]["response_format"] == {"type": "json_object"}
+    assert seen[0]["max_tokens"] == 64
+
+
 async def test_extra_body_is_merged_into_the_payload() -> None:
     seen: list[httpx.Request] = []
 

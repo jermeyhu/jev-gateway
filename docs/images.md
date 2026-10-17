@@ -1,36 +1,58 @@
 # 图片 {#images}
 
-图片输入是对参考契约的扩展。官方 Jev 接口只接受文本（文档明确
-`No image, audio, or video input`），Pydantic AI 客户端遇到非文本 part 直接抛
-`UserError: Files are not supported by this model`；本项目替换文本路径，并额外支持带截图
-或相机帧的证据打分。
-
-按托管服务写的客户端仍然可用——它们只是会忽略这个字段。
+图片使用与 TypeSafe 一致的 `assets` 引用格式。每个 asset 由引用字符串索引，并在
+`state`、`instructions` 或 `criteria` 的字符串值中使用；响应不回显图片内容。
 
 ## 图片如何挂载 {#how-images-are-attached}
 
-图片固定挂在**第一条 user message 的最前面**，使视觉编码结果和证据 prefill 在同一次请求
-的所有问题之间复用。网关会构造这样的 OpenAI content part：
+网关将每个 asset 转成 OpenAI image content part，并与引用它的状态和问题一起发送：
 
 ```json
 {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
 ```
 
-并把文本 part 追加在它们之后。没有图片时，content 保持为普通字符串。
+不被任何 state 或 question 字段引用的 asset 会被拒绝。含图片的请求必须带
+`TypeSafe-Danger-Zone-Images: true`。
 
 ## 支持的形式 {#accepted-forms}
 
-| 形式       | 示例                                        | 说明                                        |
-| ---------- | ------------------------------------------- | ------------------------------------------- |
-| data URL   | `data:image/jpeg;base64,...`                | 原样转发                                    |
-| 远程 URL   | `https://example.com/shot.png`              | 需 `multimodal.allow_remote_urls: true`    |
-| 裸 base64  | `iVBORw0KGgo...`                            | 按 magic bytes 嗅探媒体类型                |
+| 形式             | 示例                                                            | 说明                                      |
+| ---------------- | --------------------------------------------------------------- | ----------------------------------------- |
+| JSON Base64      | `{"type":"image","format":"png","data_base64":"..."}` | 标准 Base64，不带 data URL 前缀           |
+| multipart 文件   | `{"type":"image","part":"photo"}`                        | 上传文件 part 名称须与 `part` 一致        |
 
-可嗅探的格式：jpeg、png、gif、bmp、tiff、webp。base64 内部的空白（换行折行的 data URL）
-会在解码前被去掉。
+支持 PNG、JPG 和 JPEG。multipart part 可使用 `image/png`、`image/jpeg`、`image/jpg` 或
+`application/octet-stream`；网关会校验实际文件签名。
 
-其他情况一律以 `INVALID_REQUEST` 拒绝：非图片媒体类型、base64 解不开、格式无法识别、
-图片张数超限、单图超限。
+所有 asset 必须被引用；图片引用最长 1024 个 UTF-8 字节，单张图片大小由网关配置限制。
+未引用 asset、格式错误或不匹配、Base64 无效、图片超限都会以 `INVALID_REQUEST` 拒绝。
+
+### JSON Base64 示例
+
+```json
+{
+  "model": "jev-latest",
+  "state": {"photo": "photo-uuid"},
+  "assets": {
+    "photo-uuid": {"type": "image", "format": "jpg", "data_base64": "/9j/4AA..."}
+  },
+  "questions": {
+    "person_present": {
+      "type": "noul",
+      "instructions": "Is there a person in `photo`?"
+    }
+  }
+}
+```
+
+### Multipart 示例
+
+```bash
+curl http://127.0.0.1:8000/v1/systemone \
+  -H 'TypeSafe-Danger-Zone-Images: true' \
+  -F 'request={"model":"jev-latest","state":{"photo":"photo-uuid"},"assets":{"photo-uuid":{"type":"image","part":"photo-file"}},"questions":{"person_present":{"type":"noul","instructions":"Is there a person in `photo`?"}}};type=application/json' \
+  -F 'photo-file=@door.jpg;type=image/jpeg'
+```
 
 ## 限额 {#limits}
 
@@ -38,10 +60,9 @@
 
 | 键                       | 默认值               | 含义                                |
 | ------------------------ | -------------------- | ----------------------------------- |
-| `enabled`                | `true`               | 为 `false` 时任何 `images` 都报 400 |
+| `enabled`                | `true`               | 为 `false` 时任何 `assets` 都报 400 |
 | `max_images`             | `4`                  | 单次请求的图片数                    |
 | `max_image_bytes`        | `5242880`（5 MiB）   | 单图，base64 解码后计算            |
-| `allow_remote_urls`      | `false`               | 开启后才接受 `https://` 引用       |
 | `allowed_mime_prefixes`  | `["image/"]`          | 接受的媒体类型                      |
 
 ```yaml
@@ -49,15 +70,8 @@ multimodal:
   enabled: true
   max_images: 4
   max_image_bytes: 5242880
-  allow_remote_urls: false
   allowed_mime_prefixes: ["image/"]
 ```
-
-!!! danger "远程 URL 之所以默认关闭"
-
-    打开 `allow_remote_urls: true` 后，网关会去取调用方给出的任意 URL。这是一个服务端
-    请求伪造面：调用方可以让你的网关访问 `http://169.254.169.254/`，或内网里任何东西。
-    只有两端都归你所有时才开启。
 
 ## 后端看不见的时候 {#when-the-backend-cannot-see}
 
@@ -84,13 +98,16 @@ curl http://127.0.0.1:8080/props | grep -i vision
 
 ## 测试 {#testing-it}
 
-把图片读成 data URL 直接发：
+使用 UUID 作为引用，并把图片 Base64 放到 asset 中：
 
 ```bash
 curl -s http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
+  -H 'TypeSafe-Danger-Zone-Images: true' \
   -d "{
-        \"state\": {\"images\": [\"data:image/png;base64,$(base64 -w0 shot.png)\"]},
+        \"model\": \"jev-latest\",
+        \"state\": {\"screenshot\": \"screen-uuid\"},
+        \"assets\": {\"screen-uuid\": {\"type\": \"image\", \"format\": \"png\", \"data_base64\": \"$(base64 -w0 shot.png)\"}},
         \"questions\": {
           \"is_screenshot_of_an_error\": {
             \"type\": \"noul\",
@@ -104,5 +121,4 @@ curl -s http://127.0.0.1:8000/v1/systemone \
       }"
 ```
 
-若 `answers` 结构完整且 `diagnostics.questions.*.truncated` 为 `false`，说明图片链路是通的。
-对比 `usage.input_tokens` 与不带图时的数值也能看出图片是否真的被编码。
+若 `answers` 中有预期结果，且 `usage.input_tokens` 高于无图片请求，说明图片已进入模型输入。

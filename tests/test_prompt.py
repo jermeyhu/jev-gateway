@@ -9,7 +9,7 @@ from app.schemas.request import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from app.utils.imaging import ImageRef
 
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 16).decode()
-IMAGE = ImageRef("data_url", "image/png", PNG, f"data:image/png;base64,{PNG}")
+IMAGE = ImageRef("image/png", PNG, f"data:image/png;base64,{PNG}", "test-image")
 
 
 def noul(state: str = "the sky is blue"):
@@ -72,14 +72,33 @@ def test_split_prefix_is_identical_across_questions() -> None:
 
 
 def test_images_come_first_inside_the_content_parts() -> None:
-    task = to_decision_task("q", "a photo", NoulQuestion(type="noul", instructions="ok?"), (IMAGE,))
+    task = to_decision_task(
+        "q", "a test-image photo", NoulQuestion(type="noul", instructions="ok?"), (IMAGE,)
+    )
     for layout in ("fused", "split"):
         messages = build_messages(task, layout)
         parts = messages[1]["content"]
         assert isinstance(parts, list)
-        assert parts[0]["type"] == "image_url"
+        assert parts[0]["type"] == "text"
+        assert parts[1]["type"] == "image_url"
         assert parts[-1]["type"] == "text"
         assert has_images(messages)
+
+
+def test_whole_value_asset_reference_is_replaced_by_image_part() -> None:
+    task = to_decision_task(
+        "q", "test-image", NoulQuestion(type="noul", instructions="question"), (IMAGE,)
+    )
+    parts = build_messages(task)[1]["content"]
+    assert parts == [
+        {"type": "text", "text": '{"evidence":'},
+        {"type": "image_url", "image_url": {"url": IMAGE.url}},
+        {
+            "type": "text",
+            "text": ',"criterion":"question","options":'
+            '[{"letter":"A","description":"Yes"},{"letter":"B","description":"No"}]}',
+        },
+    ]
 
 
 def test_no_images_keeps_plain_string_content() -> None:

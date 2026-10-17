@@ -79,9 +79,8 @@ messages are `system`, `user` — two in total.
 
 The gateway maps every returned token onto a candidate letter. `"A"` and `" A"` both count
 as `A`; the most likely variant wins. A candidate that falls outside the top-N window is
-floored at the least likely logprob actually returned, and the question is flagged
-`truncated` in the diagnostics — raise `backend.top_logprobs` (up to 4096) if you see that
-flag.
+floored at the least likely logprob actually returned. The API omits internal diagnostics,
+so configure `backend.top_logprobs` high enough to cover the candidate set.
 
 The probabilities are renormalised over the candidates only. The rest of the vocabulary's
 mass is discarded, so a candidate that is unlikely *in absolute terms* can still hold a

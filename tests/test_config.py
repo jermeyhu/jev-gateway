@@ -39,7 +39,6 @@ EVERYTHING = {
     "JEV_MULTIMODAL_ENABLED": "false",
     "JEV_MULTIMODAL_MAX_IMAGES": "2",
     "JEV_MULTIMODAL_MAX_IMAGE_BYTES": "1024",
-    "JEV_MULTIMODAL_ALLOW_REMOTE_URLS": "true",
     "JEV_MULTIMODAL_ALLOWED_MIME_PREFIXES": "image/,application/pdf",
     "JEV_LOGGING_LEVEL": "debug",
 }
@@ -71,7 +70,6 @@ def test_defaults_are_sane() -> None:
     assert settings.request.prompt_layout in {"fused", "split"}
     assert settings.multimodal.enabled is True
     assert settings.multimodal.max_images >= 1
-    assert settings.multimodal.allow_remote_urls is False
     assert settings.log_level == "INFO"
 
 
@@ -98,7 +96,6 @@ def test_every_variable_is_read() -> None:
     assert settings.multimodal.enabled is False
     assert settings.multimodal.max_images == 2
     assert settings.multimodal.max_image_bytes == 1024
-    assert settings.multimodal.allow_remote_urls is True
     assert settings.multimodal.allowed_mime_prefixes == ("image/", "application/pdf")
     assert settings.log_level == "DEBUG"
 

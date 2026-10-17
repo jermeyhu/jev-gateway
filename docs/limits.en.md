@@ -4,10 +4,11 @@
 
 * The `noul` probability is a softmax over the two candidate letters only; calibrate
   thresholds against your own labelled set.
-* A question carries at most **16 candidates**; more is rejected with `INVALID_REQUEST`.
-* `truncated: true` in diagnostics means a candidate was floored; raise `top_logprobs`.
-* Images extend the reference contract; clients written against the hosted service still
-  work but ignore the field.
+* Choice accepts at most **16 options** and Score at most **10 levels** in this gateway.
+* Candidates outside the `top_logprobs` window are floored; internal truncation diagnostics
+   are not exposed by the API, so configure a window large enough for your candidate set.
+* Box and image inputs use TypeSafe asset references and still require a vision-capable
+   local backend.
 * Scale horizontally behind a load balancer rather than raising `max_concurrency` beyond
   the backend's real capacity.
 
@@ -79,7 +80,7 @@ letter. Check the raw response with `curl` before changing any setting.
 
 ### Can I send 17 options?
 
-No. 2 – 16 candidates per question; 17 is rejected with `INVALID_REQUEST`. Letters run
+No. 2 – 16 Choice options per question; 17 is rejected with `INVALID_REQUEST`. Letters run
 `A`…`P`.
 
 ### Do I get partial answers if one question fails?
@@ -88,11 +89,11 @@ No. Any failing question fails the whole request, and the first error in questio
 the one reported. This matches the reference implementation — a decision set is only
 meaningful as a whole.
 
-### `truncated: true` — what now?
+### What if candidate probabilities are unstable?
 
 A candidate letter fell outside the `top_logprobs` window and was floored at the least
-likely logprob actually returned. That is a lower bound, not an estimate. Raise
-`backend.top_logprobs` (16 – 4096) and re-measure.
+likely logprob actually returned. That is a lower bound, not an estimate. The API does not
+expose the internal truncation flag. Raise `backend.top_logprobs` (16 – 4096) and re-measure.
 
 Before raising it, read [Silent failure](backends#silent-logprobs-null): the server has its
 own cap and going past it does not error, it just turns `logprobs` into `null`. Probe with

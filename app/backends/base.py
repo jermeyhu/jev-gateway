@@ -35,12 +35,21 @@ class CandidateScores:
     truncated: bool
     input_tokens: int
     output_tokens: int
+    model: str | None = None
 
     @property
     def probabilities(self) -> dict[str, float]:
         keys = list(self.logprobs)
         values = stable_softmax([self.logprobs[key] for key in keys])
         return dict(zip(keys, values, strict=True))
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedJSON:
+    value: dict[str, Any]
+    input_tokens: int
+    output_tokens: int
+    model: str | None = None
 
 
 class DecisionBackend(abc.ABC):
@@ -82,8 +91,20 @@ class DecisionBackend(abc.ABC):
         messages: list[Message],
         letters: Sequence[str],
         images: Sequence[ImageRef] = (),
+        model: str | None = None,
     ) -> CandidateScores:
         """Return the logprob of each candidate letter at the next token position."""
+
+    async def generate_json(
+        self,
+        messages: list[Message],
+        images: Sequence[ImageRef] = (),
+        model: str | None = None,
+    ) -> GeneratedJSON:
+        """Generate a JSON object for primitives that return structured values."""
+        raise BackendCapabilityUnsupported(
+            f"the {self.type} backend does not support structured generation"
+        )
 
     @abc.abstractmethod
     async def check_ready(self) -> None:

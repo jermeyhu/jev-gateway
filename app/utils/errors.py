@@ -15,9 +15,11 @@ class GatewayError(Exception):
         self.detail = detail
 
     def to_payload(self, request_id: str | None = None) -> dict[str, Any]:
-        payload: dict[str, Any] = {"code": self.code, "message": self.message}
-        if self.detail is not None:
-            payload["detail"] = self.detail
+        payload: dict[str, Any] = {
+            "code": self.code,
+            "message": self.message,
+            "detail": self.detail,
+        }
         if request_id is not None:
             payload["request_id"] = request_id
         return {"error": payload}
@@ -26,6 +28,16 @@ class GatewayError(Exception):
 class InvalidRequest(GatewayError):
     code = "INVALID_REQUEST"
     status_code = 400
+
+
+class PayloadTooLarge(GatewayError):
+    code = "PAYLOAD_TOO_LARGE"
+    status_code = 413
+
+
+class UnsupportedMediaType(GatewayError):
+    code = "UNSUPPORTED_MEDIA_TYPE"
+    status_code = 415
 
 
 class BackendNotReady(GatewayError):

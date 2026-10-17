@@ -44,10 +44,9 @@ JEV_BACKEND_BASE_URL=http://192.168.1.10:8080 JEV_BACKEND_MODEL=qwen3-0.6b pytho
 | `JEV_REQUEST_MAX_QUESTIONS`              | `64`               | 单次请求 1 – 64 个问题               |
 | `JEV_REQUEST_TOTAL_TIMEOUT_SECONDS`      | `60.0`             | 整次请求预算                         |
 | `JEV_REQUEST_PROMPT_LAYOUT`              | `fused`            | `fused` \| `split`                  |
-| `JEV_MULTIMODAL_ENABLED`                 | `true`             | 为 `false` 时任何 `images` 都报 400  |
+| `JEV_MULTIMODAL_ENABLED`                 | `true`             | 为 `false` 时任何 `assets` 都报 400  |
 | `JEV_MULTIMODAL_MAX_IMAGES`              | `4`                | 单次请求的图片数                     |
 | `JEV_MULTIMODAL_MAX_IMAGE_BYTES`         | `5242880`（5 MiB） | 单图，base64 解码后计算             |
-| `JEV_MULTIMODAL_ALLOW_REMOTE_URLS`       | `false`            | 开启后才接受 `https://` 图片引用    |
 | `JEV_MULTIMODAL_ALLOWED_MIME_PREFIXES`   | `image/`           | 逗号分隔                            |
 | `JEV_LOGGING_LEVEL`                      | `INFO`             |                                      |
 
@@ -74,7 +73,7 @@ Compose 模板用的就是这个。
 应显式固定。
 
 `TOP_LOGPROBS` 是 next-token 窗口的大小。两到四个候选时默认的 `128` 已经相当宽裕；看到
-诊断里的 `truncated: true` 就上调，取值范围 16 – 4096。
+候选结果不稳定时可提高，取值范围 16 – 4096。窗口外候选会被内部截断，API 响应不暴露此诊断。
 
 !!! warning "服务端都有自己的上限，默认 128 可能直接让所有请求失败"
 
@@ -128,14 +127,10 @@ JEV_BACKEND_EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}, "re
 
 | 变量                            | 默认值               | 含义                              |
 | ------------------------------- | -------------------- | --------------------------------- |
-| `ENABLED`                       | `true`               | 为 `false` 时任何 `images` 都报 400 |
+| `ENABLED`                       | `true`               | 为 `false` 时任何 `assets` 都报 400 |
 | `MAX_IMAGES`                    | `4`                  | 单次请求的图片数                  |
 | `MAX_IMAGE_BYTES`               | `5242880`（5 MiB）   | 单图，base64 解码后计算           |
-| `ALLOW_REMOTE_URLS`             | `false`              | 开启后才接受 `https://` 图片引用 |
 | `ALLOWED_MIME_PREFIXES`         | `image/`             | 逗号分隔的 MIME 前缀              |
-
-`ALLOW_REMOTE_URLS` 默认为 `false`，因为远程 URL 会让网关去取调用方指定的任意地址——这是
-一个服务端请求伪造面。只有两端都归你所有时才应该打开。
 
 ### 日志 `JEV_LOGGING_LEVEL` {#logging}
 

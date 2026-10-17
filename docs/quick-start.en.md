@@ -59,6 +59,7 @@ curl http://127.0.0.1:8000/healthz
 curl -X POST http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
   -d '{
+    "model": "jev-latest",
     "state": {"error_rate": 0.42, "p99_latency_ms": 3100, "recent_deploy": true},
     "questions": {
       "is_healthy": {"type": "noul", "instructions": "Is the service healthy?"},
@@ -121,6 +122,7 @@ curl -s http://127.0.0.1:8000/readyz
 curl -s http://127.0.0.1:8000/v1/systemone \
   -H 'content-type: application/json' \
   -d '{
+      "model": "jev-latest",
         "state": {"error_rate": 0.31, "p99_latency_ms": 4100},
         "questions": {
           "severity": {
@@ -137,9 +139,8 @@ curl -s http://127.0.0.1:8000/v1/systemone \
 ```
 
 `/healthz` proves the process is up, `/readyz` proves the backend is ready and reports the
-model it loaded, and the last call returns the answers plus the `usage` and `diagnostics`
-blocks. To include an image, replace `state` with
-`{"images": ["data:image/png;base64,..."]}`.
+model it loaded, and the last call returns the official `model`, `answers`, and `usage`
+shape. Image requests use `assets` and references; see the [Images guide](images.en.md).
 
 !!! note "vLLM and SGLang"
 

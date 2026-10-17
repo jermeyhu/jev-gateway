@@ -11,12 +11,8 @@
 ## 1. 系统简介
 
 自托管的 Jev / System One 兼容决策网关。对外只暴露你已经在调用的 `POST /v1/systemone`，
-决策层跑在自己的推理服务上，不依赖闭源的 TypeSafe API，并在同一契约上扩展了本地图片
-输入。
-
-官方 Jev 接口只接受文本，Pydantic AI 客户端遇到文件 part 直接抛
-`UserError: Files are not supported by this model`，所以截图、相机帧这类证据根本无法参与
-打分。本项目是文本路径的直接替代品，同一个进程还能对带图片的证据额外打分。
+决策层跑在自己的推理服务上，不依赖托管 API，并支持 TypeSafe 的 `assets` 图片引用和
+`box` 视觉定位问题。
 
 网关只说一种协议：**OpenAI chat-completions API**（`POST /v1/chat/completions` 带
 `logprobs`）。任何实现了它的服务都能用——llama.cpp、vLLM、SGLang、Ollama、LM Studio、
